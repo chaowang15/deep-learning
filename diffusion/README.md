@@ -9,6 +9,7 @@
 ```text
 diffusion/
 ├── notebooks/
+│   ├── 00_check_dataset.ipynb
 │   ├── 01_forward_process.ipynb
 │   ├── 02_noise_prediction.ipynb
 │   ├── 03_ddpm_training.ipynb
@@ -42,6 +43,9 @@ diffusion/
 
 推荐按这个顺序来：
 
+0. `00_check_dataset.ipynb`
+   确认 MNIST/CIFAR-10 能正常加载，图片 shape 和 normalization 都正确。
+
 1. `schedule.py` + `01_forward_process.ipynb`
    理解 beta、alpha、alpha_bar，以及图片如何从 `x_0` 变成 `x_t`。
 
@@ -66,21 +70,47 @@ diffusion/
 
 ## Environment
 
-```bash
-cd /mnt/c/dev/deep_learning_lab/diffusion
+This project uses a Windows Conda environment named `diffusion`.
 
-python3 -m venv .venv-diffusion
-source .venv-diffusion/bin/activate
+Run these commands in Windows PowerShell:
+
+```powershell
+cd C:\dev\deep_learning_lab\diffusion
+
+conda create -n diffusion python=3.10 -y
+conda activate diffusion
 
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+
+python -m ipykernel install --user --name diffusion --display-name "Python (conda diffusion)"
+```
+
+Verify CUDA:
+
+```powershell
+python -c "import torch; print(torch.__version__); print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU only')"
+```
+
+Expected result on the desktop machine:
+
+```text
+2.4.1+cu121
+True
+NVIDIA GeForce RTX 3080
 ```
 
 如果想打开 Notebook：
 
-```bash
-source .venv-diffusion/bin/activate
+```powershell
+conda activate diffusion
 jupyter notebook
+```
+
+In VS Code Notebook, choose the kernel:
+
+```text
+Python (conda diffusion)
 ```
 
 ## Dataset
