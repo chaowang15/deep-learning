@@ -35,6 +35,7 @@ diffusion/
 │   └── logs/
 ├── assets/
 │   └── diagrams/
+├── AGENTS.md
 ├── requirements.txt
 └── README.md
 ```
@@ -120,3 +121,7 @@ Python (conda diffusion)
 数据集默认放在大项目根目录的 `data/` 目录下。也就是说，从当前 `diffusion/` 目录看，默认路径是 `../data`。
 
 数据集加载代码在 `src/datasets.py`，配置在 `configs/*.yaml`。这部分先作为工具代码使用，后面学习重点放在 diffusion 本身。
+
+## Codex Context
+
+`AGENTS.md` records project-specific Codex notes: environment choice, current progress, coding/comment style, and recommended next steps. Keep it updated when the learning path changes.
