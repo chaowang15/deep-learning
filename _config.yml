@@ -1,0 +1,10 @@
+title: Chao Wang
+description: Deep learning technical notes and study blog by Chao Wang.
+url: "https://chaowang15.github.io"
+baseurl: "/deep-learning"
+lang: zh-CN
+markdown: kramdown
+exclude:
+  - README.md
+  - Gemfile
+  - Gemfile.lock
