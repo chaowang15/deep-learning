@@ -382,6 +382,7 @@ $$\hat v=v(\varnothing,\varnothing)+s_r\big[v(r,\varnothing)-v(\varnothing,\varn
 <p>\(s_r\) 控制身份保持强度，\(s_a\) 控制口型 / 表情跟随语音的强度。40 步 × 3 = 每块 120 次前向，正是博客说的 120 NFE。</p>
 
 <h3>6.2 Student：Self-Forcing + DMD</h3>
+<p class="meta">DMD、Self-Forcing、CFG 蒸馏、4-bit 量化等技术的详细讲解和论文清单见配套笔记：<a href="/deep-learning/fast-video-diffusion/">实时视频扩散的关键技术</a>。</p>
 <table>
 <tr><th></th><th>Teacher</th><th>Student</th></tr>
 <tr><td>注意力</td><td>双向（看整段）</td><td>块因果 + 定长 KV cache</td></tr>
@@ -556,6 +557,7 @@ $$\nabla_\theta\mathcal L_{\text{DMD}}\approx\mathbb E_{t,\,\hat x=G_\theta(z)}\
 <li><b>开放问题</b>：语音 token 码率与码本结构、是否有 look-ahead、是否建模倾听状态、参数量、VAE 压缩率、训练数据规模。</li>
 </ol>
 
+<p>想深入学习这些技术，见配套笔记 <a href="/deep-learning/fast-video-diffusion/">实时视频扩散的关键技术：DMD、Self-Forcing 与推理加速</a>。</p>
 <h2>参考来源</h2>
 <p><b>博客自己提到的</b>：博客没有引用任何论文，也没有 arXiv 链接和作者名。正文只点名了几个方法：self-forcing、distribution matching distillation、classifier-free guidance、Diffusion Transformer、NVIDIA CUDA Graph、4-bit 量化感知训练，都没有给链接。正文里的外链只有对比对象 <a href="https://runway.com/product/characters">Runway Characters</a>、<a href="https://www.liveavatar.com/">HeyGen LiveAvatar</a> 和 <a href="https://aidemos.meta.com/videoseal/">Meta Video Seal</a>。</p>
 <ul>
