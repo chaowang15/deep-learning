@@ -1,0 +1,481 @@
+---
+layout: note
+title: "Meta Muse Realtime Avatar 技术解析"
+description: "Meta Muse 实时数字人：音频驱动块因果 DiT 的网络架构、Self-Forcing + DMD 蒸馏与 25 fps 实时工程解析。"
+---
+<style>
+.muse-note{--card:#fff;--fg:#202124;--muted:#667085;--line:#e6e8eb;--code:#f3f5f7;
+--accent:#2f5d8a;--accent-soft:#e6eef6;--warm:#b5651d;--warm-soft:#f8ece0;--green:#3f7a4f;--green-soft:#e5f1e7;
+--violet:#6a4c93;--violet-soft:#efe8f6;--blog:#2f5d8a;--infer:#b5651d;
+--sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;--mono:"SF Mono",Menlo,Consolas,monospace}
+.muse-note td.mono{font-family:var(--mono);font-size:13px;white-space:nowrap}
+.muse-note .meta{color:var(--muted);font-size:14px}
+.muse-note figure{max-width:none}
+.muse-note .tag{display:inline-block;font-size:12px;line-height:1;padding:4px 7px;border-radius:4px;vertical-align:2px;font-weight:600;white-space:nowrap}
+.muse-note .tag.b{background:var(--accent-soft);color:var(--blog)}
+.muse-note .tag.i{background:var(--warm-soft);color:var(--infer)}
+.muse-note .legend{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 16px;font-size:15px}
+.muse-note .tldr{background:var(--accent-soft);border-left:4px solid var(--accent);padding:14px 18px;border-radius:0 8px 8px 0}
+.muse-note .tldr ol{margin:.4em 0 0;padding-left:1.3em}
+.muse-note figure{margin:2em 0;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 18px 10px}
+.muse-note figure svg{width:100%;height:auto;display:block}
+.muse-note figcaption{font-size:14px;color:var(--muted);margin-top:10px;line-height:1.6}
+.muse-note figcaption b{color:var(--fg)}
+.muse-note svg text{font-family:var(--sans);fill:var(--fg)}
+.muse-note svg .sm{font-size:11.5px;fill:var(--muted)}
+.muse-note svg .xs{font-size:10.5px;fill:var(--muted)}
+.muse-note svg .mono{font-family:var(--mono);font-size:11px;fill:var(--muted)}
+.muse-note svg .ttl{font-size:14px;font-weight:700}
+.muse-note svg .lbl{font-size:13px;font-weight:600}
+.muse-note svg .box{fill:var(--card);stroke:var(--fg);stroke-width:1.3}
+.muse-note svg .io{fill:var(--code);stroke:var(--muted);stroke-width:1.2}
+.muse-note svg .blue{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5}
+.muse-note svg .warm{fill:var(--warm-soft);stroke:var(--warm);stroke-width:1.5}
+.muse-note svg .green{fill:var(--green-soft);stroke:var(--green);stroke-width:1.5}
+.muse-note svg .violet{fill:var(--violet-soft);stroke:var(--violet);stroke-width:1.5}
+.muse-note svg .grey{fill:var(--code);stroke:var(--line);stroke-width:1.2}
+.muse-note svg .dash{stroke-dasharray:5 4}
+.muse-note svg .group{fill:none;stroke:var(--muted);stroke-width:1.1;stroke-dasharray:3 3}
+.muse-note svg .arr{fill:none;stroke:var(--fg);stroke-width:1.4}
+.muse-note svg .arr.a{stroke:var(--accent)}
+.muse-note svg .arr.w{stroke:var(--warm)}
+.muse-note svg .arr.g{stroke:var(--green)}
+.muse-note svg .arr.v{stroke:var(--violet)}
+.muse-note svg .ah{fill:var(--fg)}
+.muse-note svg .ah.a{fill:var(--accent)} .muse-note svg .ah.w{fill:var(--warm)} .muse-note svg .ah.g{fill:var(--green)} .muse-note svg .ah.v{fill:var(--violet)}
+</style>
+<div class="muse-note">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+ <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+ <marker id="ah-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah a" d="M0,0 L10,5 L0,10 z"/></marker>
+ <marker id="ah-w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah w" d="M0,0 L10,5 L0,10 z"/></marker>
+ <marker id="ah-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah g" d="M0,0 L10,5 L0,10 z"/></marker>
+ <marker id="ah-v" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah v" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs></svg>
+<h1>Meta Muse Realtime Avatar 技术解析</h1>
+<p class="meta">2026-11-26 · 基于 Meta 官方博客 <a href="https://research.meta.ai/blog/bringing-your-muse-to-life">Bringing your Muse to life</a>（2026-09-23）与 <a href="https://about.fb.com/news/2026/11/introducing-muse-ai-voice-expressive-avatars/">产品发布</a>（2026-11-05），结合公开论文推断整理</p>
+
+<div class="legend">
+<b>标注约定</b>：<span class="tag b">博客</span> 原文明确写到；<span class="tag i">推断</span> 原文没写，根据相关论文与工程常识推测，括号内标可信度（高 / 中 / 低）。
+图中 <b>实线框</b> = 博客明确，<b>虚线框</b> = 推断。原文没有作者、论文引用、参数量和训练数据描述，所以涉及这些的内容全部是推断。
+博客原图不在本页转载，需要时点链接看原文。
+</div>
+
+
+<h2 id="tldr">0. 一句话结论</h2>
+<div class="tldr">
+Muse 的实时头像<b>不是</b>「TTS → 音频特征 → 3D 人脸 / 骨骼动画 → 渲染」的传统管线，而是一个<b>直接在视频 VAE latent 空间生成画面的音频驱动 Diffusion Transformer</b>。三个关键设计：
+<ol>
+<li><b>不吃波形，吃语音 token</b>：语音模型输出的离散 token（博客叫 VQs）同时送给音频解码器和视频模型，天然同步，省掉 wav2vec / Whisper 这类音频编码器的延迟。</li>
+<li><b>双向 teacher → 因果 student 蒸馏</b>：用 Self-Forcing + DMD 把 40 步、三路 CFG（每块 120 次前向）的双向模型，压成 2 步、无 guidance 的块因果自回归模型，固定长度 KV cache，每块 8 帧流式生成。</li>
+<li><b>重度推理工程</b>：4-bit 量化感知训练、CUDA Graph、融合 kernel、持久化 KV cache、动态 batching，一张 GB200 跑 12 路并发 25 fps。</li>
+</ol></div>
+
+<h2 id="io">1. 产品层面：输入和输出</h2>
+<h3>输入</h3>
+<ul>
+<li><span class="tag b">博客</span> 一张<b>参考媒体</b>：人像、全身插画、动物，甚至物体。</li>
+<li><span class="tag b">博客</span> Muse Realtime Voice 输出的<b>语音 token 流</b>（VQs），同时携带「说什么」（content）和「怎么说」（delivery：语气、韵律）。</li>
+<li><span class="tag b">博客</span> 最近若干帧视频 latent 的<b>滚动窗口</b>，作为运动上下文。</li>
+<li><span class="tag i">推断·高</span> 更上游：用户语音 → 端点检测 / 语音理解 → Muse 大模型（Spark 家族）生成回复 → Realtime Voice 生成语音 token。博客没说 Voice 内部是端到端语音 LLM 还是「文本 LLM + TTS」。媒体报道提到支持打断（barge-in）和上百种音色。</li>
+</ul>
+<h3>输出</h3>
+<ul>
+<li><span class="tag b">博客</span> 448×768 竖屏视频，25 fps，与语音同步。</li>
+<li><span class="tag b">博客</span> 人像有细微表情；全身插画有手势和身体姿态变化；多轮对话外观一致。</li>
+<li><span class="tag b">博客</span> 用户说完话到第一个音视频同步回复字节约 <b>870 ms</b>。</li>
+<li><span class="tag b">博客</span> 视频带 Meta Video Seal 隐形水印，不增加延迟。</li>
+</ul>
+
+<h2 id="pipeline">2. 端到端系统管线</h2>
+<figure>
+<svg viewBox="0 0 1040 335" role="img" aria-label="Muse 实时对话系统管线">
+ <text class="sm" x="520" y="16" text-anchor="middle">⟵ 约 870 ms：用户说完 → 首个音视频同步字节 ⟶</text>
+ <line x1="10" y1="24" x2="1030" y2="24" stroke="var(--line)"/>
+ <rect class="io" x="10" y="40" width="110" height="56" rx="8"/><text class="lbl" x="65" y="64" text-anchor="middle">用户语音</text><text class="xs" x="65" y="82" text-anchor="middle">麦克风流</text>
+ <rect class="box dash" x="150" y="40" width="120" height="56" rx="8"/><text class="lbl" x="210" y="64" text-anchor="middle">端点检测 / ASR</text><text class="xs" x="210" y="82" text-anchor="middle">推断</text>
+ <rect class="box" x="300" y="40" width="120" height="56" rx="8"/><text class="lbl" x="360" y="64" text-anchor="middle">Muse LLM</text><text class="xs" x="360" y="82" text-anchor="middle">Spark 家族 · 生成回复</text>
+ <rect class="blue" x="450" y="40" width="140" height="56" rx="8"/><text class="lbl" x="520" y="64" text-anchor="middle">Muse Realtime Voice</text><text class="xs" x="520" y="82" text-anchor="middle">流式语音生成</text>
+ <rect class="violet" x="620" y="46" width="120" height="44" rx="22"/><text class="lbl" x="680" y="73" text-anchor="middle">语音 token (VQs)</text>
+ <rect class="box" x="780" y="40" width="110" height="56" rx="8"/><text class="lbl" x="835" y="64" text-anchor="middle">Audio Decoder</text><text class="xs" x="835" y="82" text-anchor="middle">token → 波形</text>
+ <rect class="green" x="920" y="40" width="110" height="250" rx="8"/>
+ <text class="lbl" x="975" y="110" text-anchor="middle">A/V 同步编排</text>
+ <text class="lbl" x="975" y="140" text-anchor="middle">实时视频引擎</text>
+ <text class="lbl" x="975" y="170" text-anchor="middle">Video Seal 水印</text>
+ <text class="lbl" x="975" y="200" text-anchor="middle">→ 客户端</text>
+ <text class="xs" x="975" y="250" text-anchor="middle">448×768 @ 25 fps</text>
+ <text class="xs" x="975" y="266" text-anchor="middle">推流协议未公开</text>
+ <rect class="io" x="450" y="200" width="140" height="56" rx="8"/><text class="lbl" x="520" y="224" text-anchor="middle">参考媒体</text><text class="xs" x="520" y="242" text-anchor="middle">人像 / 插画 / 动物 / 物体</text>
+ <rect class="blue" x="620" y="185" width="160" height="86" rx="8" style="stroke-width:2.2"/>
+ <text class="ttl" x="700" y="213" text-anchor="middle">Muse Realtime Avatar</text>
+ <text class="sm" x="700" y="233" text-anchor="middle">音频驱动 · 块因果 DiT</text>
+ <text class="sm" x="700" y="251" text-anchor="middle">2 步 · 每块 8 帧</text>
+ <rect class="box dash" x="800" y="200" width="100" height="56" rx="8"/><text class="lbl" x="850" y="224" text-anchor="middle">VAE 解码</text><text class="xs" x="850" y="242" text-anchor="middle">latent → 像素</text>
+ <path class="arr" d="M120 68 H148" marker-end="url(#ah)"/>
+ <path class="arr" d="M270 68 H298" marker-end="url(#ah)"/>
+ <path class="arr" d="M420 68 H448" marker-end="url(#ah)"/>
+ <path class="arr v" d="M590 68 H618" marker-end="url(#ah-v)"/>
+ <path class="arr v" d="M740 68 H778" marker-end="url(#ah-v)"/>
+ <path class="arr" d="M890 68 H918" marker-end="url(#ah)"/>
+ <path class="arr v" d="M680 90 V183" marker-end="url(#ah-v)"/>
+ <text class="xs" x="688" y="132">同一条 token 流</text><text class="xs" x="688" y="146">→ 天然音画同步</text>
+ <path class="arr" d="M590 228 H618" marker-end="url(#ah)"/>
+ <path class="arr" d="M780 228 H798" marker-end="url(#ah)"/>
+ <path class="arr" d="M900 228 H918" marker-end="url(#ah)"/>
+ <path class="arr w" d="M745 271 V305 H655 V273" marker-end="url(#ah-w)"/>
+ <text class="sm" x="700" y="324" text-anchor="middle">每块最新 latent → 下一块的滚动上下文</text>
+</svg>
+<figcaption><b>图 1　系统管线。</b> 语音 token 一路送音频解码器，一路送视频模型；视频模型以「语音 token + 参考媒体 + 自己刚生成的 latent 窗口」为条件，每次产出 8 帧（320 ms）。端点检测 / ASR、VAE 解码、推流协议博客没写，为推断。对应博客原图见 <a href="https://research.meta.ai/blog/bringing-your-muse-to-life">原文</a> 中的流式架构图。</figcaption>
+</figure>
+
+<h3>为什么用语音 token 而不是波形驱动（核心设计）</h3>
+<p>传统 talking-head（Hallo、EMO、OmniHuman、MoCha 等）一般是 TTS 出波形 → wav2vec2 / Whisper 提音频特征 → 驱动视频。Muse 直接拿 TTS 的<b>中间离散 token</b>：</p>
+<ul>
+<li><b>省延迟</b>：不用等波形解码，再跑一个音频编码器；token 一出来两路并行消费。</li>
+<li><b>天然同步</b>：声音和画面来自同一个 token 序列，时间轴一一对应，不会 A/V 漂移。</li>
+<li><b>信号更干净</b>：token 已编码音素和韵律 / 情绪，对口型和表情强度直接可用，不受音色、噪声干扰。</li>
+<li><span class="tag i">推断·中</span> <b>可以「看未来」</b>：语音 token 生成速度远快于播放，生成第 n 块视频时可能已拿到之后几百毫秒的 token。人说话时嘴型会<b>提前</b>于声音（协同发音），所以 look-ahead 对口型很重要。博客未说明是否使用。</li>
+<li><span class="tag i">推断·中</span> 代价：训练视频的真实音频要用同一个语音 tokenizer 编码成 VQ token 作为条件，avatar 与 voice 的 tokenizer 绑定，换语音模型就得重训条件分支。</li>
+</ul>
+
+<h2 id="arch">3. 网络架构逐模块拆解</h2>
+<p><span class="tag b">博客</span> 只给出：Audio-driven Diffusion Transformer；条件是语音 token 流、参考媒体、最近视频 latent 的滚动窗口；按短的因果 chunk 生成；固定长度 KV cache；memory-aware positional encodings；teacher 双向 40 步三路 CFG，student 因果 2 步无 guidance。下面把这些拼成一个完整、可实现的架构，所有具体数值都是<b>推断</b>，主要参照 Movie Gen / Wan（视频 VAE + DiT）、CausVid / Self-Forcing（因果蒸馏）、OmniHuman / Hallo3（音频条件注入）。</p>
+
+<figure>
+<svg viewBox="0 0 1040 585" role="img" aria-label="音频驱动块因果 DiT 架构">
+ <!-- inputs -->
+  <rect class="io" x="10" y="53" width="120" height="54" rx="8"/><text class="lbl" x="70" y="76" text-anchor="middle">噪声 latent x_t</text><text class="mono" x="70" y="95" text-anchor="middle">16×2×96×56</text>
+ <rect class="box" x="250" y="53" width="150" height="54" rx="8"/><text class="lbl" x="325" y="76" text-anchor="middle">Patchify 2×2 + Linear</text><text class="mono" x="325" y="95" text-anchor="middle">2688 × d · 当前块</text>
+ <path class="arr" d="M130 80 H248" marker-end="url(#ah)"/>
+
+ <rect class="grey" x="10" y="124" width="220" height="54" rx="8"/><text class="lbl" x="120" y="147" text-anchor="middle">历史块 latent（自己生成）</text><text class="xs" x="120" y="166" text-anchor="middle">每块生成后以 t=0 再前向一次写入</text>
+ <rect class="warm" x="250" y="124" width="150" height="54" rx="8"/><text class="lbl" x="325" y="147" text-anchor="middle">KV Cache（定长）</text><text class="mono" x="325" y="166" text-anchor="middle">参考 + 最近 W 块</text>
+ <path class="arr" d="M230 151 H248" marker-end="url(#ah)"/>
+
+ <rect class="io" x="10" y="200" width="120" height="54" rx="8"/><text class="lbl" x="70" y="223" text-anchor="middle">参考图</text><text class="mono" x="70" y="242" text-anchor="middle">3×768×448</text>
+ <rect class="box dash" x="146" y="200" width="88" height="54" rx="8"/><text class="lbl" x="190" y="223" text-anchor="middle">VAE Enc</text><text class="xs" x="190" y="242" text-anchor="middle">共享编码器</text>
+ <rect class="warm" x="250" y="200" width="150" height="54" rx="8"/><text class="lbl" x="325" y="223" text-anchor="middle">参考 token</text><text class="mono" x="325" y="242" text-anchor="middle">1344 × d · 只算一次</text>
+ <path class="arr" d="M130 227 H144" marker-end="url(#ah)"/><path class="arr" d="M234 227 H248" marker-end="url(#ah)"/>
+ <path class="arr w" d="M325 200 V180" marker-end="url(#ah-w)"/>
+
+ <rect class="violet" x="10" y="277" width="120" height="54" rx="8"/><text class="lbl" x="70" y="300" text-anchor="middle">语音 VQ token</text><text class="mono" x="70" y="319" text-anchor="middle">K × (8+L) @25Hz</text>
+ <rect class="box dash" x="146" y="277" width="254" height="54" rx="8"/><text class="lbl" x="273" y="300" text-anchor="middle">K 个码本 Embedding 求和 + 时序 Conv</text><text class="mono" x="273" y="319" text-anchor="middle">c_a : (8+L) × d</text>
+ <path class="arr v" d="M130 304 H144" marker-end="url(#ah-v)"/>
+
+ <rect class="io" x="10" y="372" width="120" height="54" rx="8"/><text class="lbl" x="70" y="395" text-anchor="middle">扩散时间 t</text><text class="xs" x="70" y="414" text-anchor="middle">student 只有 2 个值</text>
+ <rect class="box" x="146" y="372" width="254" height="54" rx="8"/><text class="lbl" x="273" y="395" text-anchor="middle">Sinusoidal + MLP</text><text class="xs" x="273" y="414" text-anchor="middle">→ 每层 adaLN 的 scale / shift / gate</text>
+
+ <!-- DiT stack -->
+ <rect class="group" x="440" y="30" width="280" height="425" rx="12"/>
+ <text class="ttl" x="580" y="50" text-anchor="middle">DiT Block × N</text>
+ <rect class="grey dash" x="460" y="62" width="240" height="36" rx="6"/><text class="lbl" x="580" y="85" text-anchor="middle">adaLN-Zero (t)</text>
+ <rect class="blue" x="460" y="114" width="240" height="140" rx="8"/>
+ <text class="lbl" x="580" y="137" text-anchor="middle">Self-Attention（块因果）</text>
+ <rect class="warm" x="474" y="152" width="44" height="22"/>
+ <rect class="grey" x="518" y="152" width="40" height="22" style="stroke:var(--muted)"/><rect class="grey" x="558" y="152" width="40" height="22" style="stroke:var(--muted)"/><rect class="grey" x="598" y="152" width="40" height="22" style="stroke:var(--muted)"/>
+ <rect class="blue" x="638" y="152" width="48" height="22" style="fill:var(--accent);opacity:.55"/>
+ <text class="xs" x="496" y="188" text-anchor="middle">参考</text><text class="xs" x="578" y="188" text-anchor="middle">历史窗口 W 块</text><text class="xs" x="662" y="188" text-anchor="middle">当前</text>
+ <text class="sm" x="580" y="212" text-anchor="middle">Q = 当前块；K, V = 整条可见序列</text>
+ <text class="sm" x="580" y="230" text-anchor="middle">3D RoPE + memory-aware 位置重映射</text>
+ <rect class="violet dash" x="460" y="280" width="240" height="48" rx="8"/><text class="lbl" x="580" y="300" text-anchor="middle">Cross-Attention → 语音特征</text><text class="xs" x="580" y="318" text-anchor="middle">按时间对齐的局部窗口</text>
+ <rect class="grey dash" x="460" y="345" width="240" height="34" rx="6"/><text class="lbl" x="580" y="367" text-anchor="middle">adaLN-Zero (t)</text>
+ <rect class="box" x="460" y="395" width="240" height="40" rx="6"/><text class="lbl" x="580" y="420" text-anchor="middle">FFN (SwiGLU)</text>
+ <path class="arr" d="M580 98 V112" marker-end="url(#ah)"/>
+ <path class="arr" d="M580 254 V278" marker-end="url(#ah)"/>
+ <path class="arr" d="M580 328 V343" marker-end="url(#ah)"/>
+ <path class="arr" d="M580 379 V393" marker-end="url(#ah)"/>
+ <!-- connections in -->
+ <path class="arr a" d="M400 80 H458" marker-end="url(#ah-a)"/>
+ <path class="arr w" d="M400 151 H458" marker-end="url(#ah-w)"/>
+ <path class="arr v" d="M400 304 H458" marker-end="url(#ah-v)"/>
+ <path class="arr" d="M400 399 H422 V362 H458" marker-end="url(#ah)"/>
+
+ <!-- head -->
+ <rect class="box" x="460" y="480" width="240" height="50" rx="8"/><text class="lbl" x="580" y="501" text-anchor="middle">Final adaLN + Linear + Unpatchify</text><text class="mono" x="580" y="520" text-anchor="middle">v̂ 或 x̂₀ : 16×2×96×56</text>
+ <path class="arr" d="M580 435 V478" marker-end="url(#ah)"/>
+
+ <!-- right column -->
+ <rect class="green" x="770" y="60" width="250" height="118" rx="8"/>
+ <text class="ttl" x="895" y="84" text-anchor="middle">2 步采样器（student）</text>
+ <text class="sm" x="895" y="106" text-anchor="middle">t₁ = 1 → 预测 x̂₀ → 加噪到 t₂</text>
+ <text class="sm" x="895" y="124" text-anchor="middle">t₂ → 预测 x̂₀ = 最终 latent</text>
+ <text class="sm" x="895" y="142" text-anchor="middle">无 CFG（已蒸进权重）</text>
+ <text class="xs" x="895" y="162" text-anchor="middle">teacher：40 步 × 3 路 CFG</text>
+ <path class="arr" d="M700 505 H740 V119 H768" marker-end="url(#ah)"/>
+ <path class="arr g dash" d="M895 60 V8 H70 V51" marker-end="url(#ah-g)"/>
+ <text class="xs" x="903" y="32">第 2 步：重新加噪后再过一遍网络</text>
+ <rect class="blue" x="770" y="205" width="250" height="54" rx="8"/><text class="lbl" x="895" y="228" text-anchor="middle">干净 latent z_n</text><text class="mono" x="895" y="247" text-anchor="middle">16×2×96×56（= 8 帧）</text>
+ <path class="arr" d="M895 178 V203" marker-end="url(#ah)"/>
+ <rect class="box dash" x="770" y="290" width="250" height="54" rx="8"/><text class="lbl" x="895" y="313" text-anchor="middle">因果 VAE 解码（带时间缓存）</text><text class="mono" x="895" y="332" text-anchor="middle">→ 8 × 3 × 768 × 448</text>
+ <path class="arr" d="M895 259 V288" marker-end="url(#ah)"/>
+ <rect class="io" x="770" y="375" width="250" height="54" rx="8"/><text class="lbl" x="895" y="398" text-anchor="middle">8 帧 RGB = 320 ms 播放</text><text class="xs" x="895" y="417" text-anchor="middle">→ 水印 → 视频引擎</text>
+ <path class="arr" d="M895 344 V373" marker-end="url(#ah)"/>
+ <text class="sm" x="895" y="458" text-anchor="middle">z_n 同时写回 KV cache，</text>
+ <text class="sm" x="895" y="475" text-anchor="middle">作为第 n+1 块的历史（自回归）</text>
+
+ <!-- legend -->
+ <rect class="box" x="10" y="470" width="28" height="16" rx="3"/><text class="xs" x="46" y="482">博客明确 / 必然存在</text>
+ <rect class="box dash" x="10" y="496" width="28" height="16" rx="3"/><text class="xs" x="46" y="508">具体形式为推断</text>
+ <text class="xs" x="10" y="540">d ≈ 2048–3072，N ≈ 28–40，L = 语音 look-ahead token 数</text>
+ <text class="xs" x="10" y="558">形状按「时间 4× / 空间 8× / 16 通道」VAE 估算</text>
+ <text class="xs" x="10" y="576">（全部为推断）</text>
+</svg>
+<figcaption><b>图 2　Muse Realtime Avatar 的推断架构（单个 8 帧块的一次去噪）。</b> 当前块的噪声 latent 被切成 token，经过 N 层 DiT block：块因果自注意力看「参考 token + 历史窗口 + 当前块」，交叉注意力看时间对齐的语音特征，扩散时间通过 adaLN 调制。2 步采样后得到干净 latent，一边解码成 8 帧画面，一边写回 KV cache 供下一块使用。</figcaption>
+</figure>
+
+<h3>3.1 视频 VAE：把像素压到 latent <span class="tag i">推断·高</span></h3>
+<p>能 2.5 ms 出一帧的前提，是 DiT 不在像素上跑。几乎可以确定使用了一个<b>时空压缩的因果视频 VAE</b>（类似 Movie Gen 的 TAE、Wan 的 causal 3D VAE）。按最常见配置「时间 4×、空间 8×、16 通道」：</p>
+<ul>
+<li>一帧 448×768 → latent 56×96（宽×高），16 通道。</li>
+<li>8 个像素帧 → 2 个 latent 帧，所以一个 chunk 的 latent 是 <code>16×2×96×56</code>。8 帧恰好是 4× 时间压缩下最小的「整 2 latent 帧」单位，这也解释了博客为什么选 8 帧一块。</li>
+<li>解码端必须是<b>因果的、带时间缓存</b>的（像 CausVid 那样逐块解码），否则块与块的边界会出现跳变。</li>
+</ul>
+
+<h3>3.2 Tokenizer：patchify 与参考 token</h3>
+<ul>
+<li><b>当前块</b>：2×2 空间 patch（时间 1）+ 线性投影，每个 latent 帧 48×28 = <b>1344 个 token</b>，一块 <b>2688 个 token</b>。</li>
+<li><b>参考图</b> <span class="tag i">推断·中</span>：用同一个 VAE 编码成单个 latent 帧，再 patchify 得到 1344 个 token。会话开始时算一次 K/V 放进 cache 最前面，之后每块都能 attend 到，相当于一个「身份锚点 / attention sink」。博客说的「跨轮次外观一致」应主要靠它。这种做法比把参考图在通道维拼接（Hallo 早期做法）更适合因果流式，因为参考不占用每块的计算。</li>
+<li>全身插画、动物、物体也能当参考，说明参考分支不依赖人脸检测或关键点，纯靠 latent。</li>
+</ul>
+
+<h3>3.3 语音条件分支 <span class="tag i">推断·中</span></h3>
+<ul>
+<li><b>输入</b>：语音 VQ token。若是 RVQ / 多码本结构（Mimi、EnCodec 类），每个时间步有 K 个码本索引；最自然的帧率是 <b>12.5 Hz 或 25 Hz</b>。25 Hz 时恰好与 25 fps 视频一一对齐，一块 8 帧对应 8 个时间步。</li>
+<li><b>编码</b>：每个码本一张 embedding 表，K 个 embedding 求和得到每个时间步一个向量；再过一个小的时序卷积或 Transformer 做局部上下文聚合，输出 <code>c_a: (8+L) × d</code>。L 是可能存在的 look-ahead（比如向后看 4–8 个 token，160–320 ms）。</li>
+<li><b>注入方式</b>：两种主流方案。① <b>Cross-attention</b>：视频 token 作 Q、语音特征作 K/V，并加时间对齐的局部 mask（OmniHuman、Hallo3 用这种）；② <b>按时间加和</b>：把语音特征按 latent 帧对齐后用 adaLN 调制或直接加到对应帧的 token 上。图 2 画的是 ①，因为它对 look-ahead 更灵活。</li>
+<li>博客强调 token 同时承载 content 和 delivery，所以这一个分支同时驱动<b>口型</b>（content）和<b>表情强度 / 头部动作</b>（delivery），不需要单独的情绪编码器。</li>
+</ul>
+
+<h3>3.4 DiT block <span class="tag i">推断·中</span></h3>
+<p>标准的视频 DiT block（与 Movie Gen、Wan 同构），每层依次为：</p>
+<ol>
+<li><b>adaLN-Zero</b>：用扩散时间 t 的 embedding 生成 scale / shift / gate，调制 LayerNorm。student 只有两个时间值，这部分可以预先算好。</li>
+<li><b>块因果自注意力</b> <span class="tag b">博客：因果 + 定长 KV cache</span>：Q 只来自当前块 2688 个 token；K/V 来自「参考 1344 + 最近 W 块 × 2688 + 当前块 2688」。块内是双向的，块间只能看过去。位置编码是 3D RoPE（时间 × 高 × 宽），时间轴做了重映射，详见 §4。</li>
+<li><b>交叉注意力</b>到语音特征（见 3.3）。</li>
+<li><b>FFN</b>（SwiGLU），残差连接。</li>
+</ol>
+<p><b>规模估算</b> <span class="tag i">推断·低</span>：单会话每块 20 ms、一张 GB200 撑 12 路，用 FP4 算力反推，模型大概在 <b>2–5B 参数</b>量级（d ≈ 2048–3072，N ≈ 28–40 层）。更大的模型在 2 步 + FP4 下也跑不进 12 路的预算。</p>
+
+<h3>3.5 输出头与采样</h3>
+<ul>
+<li>最后一层 adaLN + 线性层 + unpatchify，回到 <code>16×2×96×56</code>。预测目标是 flow matching 的速度 v（Movie Gen 用的就是 flow matching），或者 DMD 蒸馏后常用的 x̂₀。</li>
+<li><span class="tag b">博客</span> student 2 步、无 guidance：第 1 步从纯噪声（t=1）预测 x̂₀，再按 t₂ 重新加噪；第 2 步再预测一次 x̂₀，作为最终结果。</li>
+<li><span class="tag i">推断·中</span> CausVid / Self-Forcing 的做法是生成完一块后，再用 t=0 的干净 latent 跑一次前向来<b>写 KV cache</b>，这样下一块看到的是干净历史的 K/V。所以实际每块可能是「2 次去噪 + 1 次写 cache」。博客的「每步 20 ms」可能已把这些合计在内。</li>
+</ul>
+
+<h2 id="shapes">4. 张量形状一览 <span class="tag i">推断</span></h2>
+<table>
+<tr><th>模块</th><th>输入</th><th>输出</th><th>说明</th></tr>
+<tr><td>参考图 VAE 编码</td><td class="mono">3×768×448</td><td class="mono">16×1×96×56</td><td>会话开始做一次</td></tr>
+<tr><td>参考 patchify</td><td class="mono">16×1×96×56</td><td class="mono">1344×d</td><td>K/V 常驻 cache</td></tr>
+<tr><td>当前块 patchify</td><td class="mono">16×2×96×56</td><td class="mono">2688×d</td><td>8 帧 = 2 latent 帧</td></tr>
+<tr><td>语音分支</td><td class="mono">K×(8+L) 索引</td><td class="mono">(8+L)×d</td><td>25 Hz 假设</td></tr>
+<tr><td>时间嵌入</td><td class="mono">t（标量）</td><td class="mono">6d（每层）</td><td>adaLN 参数</td></tr>
+<tr><td>Self-Attn</td><td class="mono">Q 2688；KV 1344+2688(W+1)</td><td class="mono">2688×d</td><td>W=3 时 KV ≈ 12k token</td></tr>
+<tr><td>Cross-Attn</td><td class="mono">Q 2688；KV (8+L)</td><td class="mono">2688×d</td><td>按帧对齐</td></tr>
+<tr><td>输出头</td><td class="mono">2688×d</td><td class="mono">16×2×96×56</td><td>v̂ 或 x̂₀</td></tr>
+<tr><td>VAE 解码</td><td class="mono">16×2×96×56</td><td class="mono">8×3×768×448</td><td>因果、带缓存</td></tr>
+</table>
+
+<h2 id="kv">5. 因果分块、KV cache 与 memory-aware 位置编码</h2>
+<figure>
+<svg viewBox="0 0 1040 296" role="img" aria-label="KV cache 滚动窗口与注意力 mask">
+ <text class="ttl" x="20" y="24">(a) 滚动窗口（W = 3 为例）</text>
+ <path d="M270 70 V60 H544 V70" fill="none" stroke="var(--accent)" stroke-width="1.4"/>
+ <text class="sm" x="407" y="56" text-anchor="middle" style="fill:var(--accent)">当前块可见的历史 + 自身</text>
+ <rect class="warm" x="20" y="80" width="64" height="46" rx="6"/><text class="lbl" x="52" y="108" text-anchor="middle">参考</text>
+ <text class="lbl" x="107" y="108" text-anchor="middle">…</text>
+ <rect class="grey" x="130" y="80" width="64" height="46" rx="6" opacity=".55"/><text class="lbl" x="162" y="108" text-anchor="middle" style="fill:var(--muted)">n−5</text>
+ <rect class="grey" x="200" y="80" width="64" height="46" rx="6" opacity=".55"/><text class="lbl" x="232" y="108" text-anchor="middle" style="fill:var(--muted)">n−4</text>
+ <rect class="violet" x="270" y="80" width="64" height="46" rx="6"/><text class="lbl" x="302" y="108" text-anchor="middle">n−3</text>
+ <rect class="violet" x="340" y="80" width="64" height="46" rx="6"/><text class="lbl" x="372" y="108" text-anchor="middle">n−2</text>
+ <rect class="violet" x="410" y="80" width="64" height="46" rx="6"/><text class="lbl" x="442" y="108" text-anchor="middle">n−1</text>
+ <rect class="blue" x="480" y="80" width="64" height="46" rx="6" style="stroke-width:2.2"/><text class="lbl" x="512" y="108" text-anchor="middle">n</text>
+ <rect class="box dash" x="550" y="80" width="64" height="46" rx="6" opacity=".6"/><text class="lbl" x="582" y="108" text-anchor="middle" style="fill:var(--muted)">n+1</text>
+ <path class="arr w" d="M52 80 C60 14 470 14 505 78" marker-end="url(#ah-w)"/>
+ <text class="xs" x="197" y="146" text-anchor="middle">已驱逐，不再占显存</text>
+ <text class="xs" x="582" y="146" text-anchor="middle">未生成</text>
+ <text class="sm" x="20" y="182">原始时间位置</text>
+ <text class="mono" x="52" y="200" text-anchor="middle">固定</text><text class="mono" x="302" y="200" text-anchor="middle">2n−6</text><text class="mono" x="372" y="200" text-anchor="middle">2n−4</text><text class="mono" x="442" y="200" text-anchor="middle">2n−2</text><text class="mono" x="512" y="200" text-anchor="middle">2n</text>
+ <text class="sm" x="20" y="232">重映射后</text>
+ <text class="mono" x="52" y="250" text-anchor="middle">固定</text><text class="mono" x="302" y="250" text-anchor="middle" style="fill:var(--accent)">0</text><text class="mono" x="372" y="250" text-anchor="middle" style="fill:var(--accent)">2</text><text class="mono" x="442" y="250" text-anchor="middle" style="fill:var(--accent)">4</text><text class="mono" x="512" y="250" text-anchor="middle" style="fill:var(--accent)">6</text>
+ <text class="xs" x="20" y="278">原始位置随对话无限增长；重映射后窗口内位置始终落在训练见过的范围（推断）</text>
+
+ <text class="ttl" x="700" y="24">(b) Student 注意力 mask</text>
+ <g transform="translate(760,50)">
+  <text class="xs" x="20" y="-6" text-anchor="middle">R</text><text class="xs" x="60" y="-6" text-anchor="middle">c₁</text><text class="xs" x="100" y="-6" text-anchor="middle">c₂</text><text class="xs" x="140" y="-6" text-anchor="middle">c₃</text><text class="xs" x="180" y="-6" text-anchor="middle">n</text>
+  <text class="xs" x="-10" y="25" text-anchor="end">R</text><text class="xs" x="-10" y="65" text-anchor="end">c₁</text><text class="xs" x="-10" y="105" text-anchor="end">c₂</text><text class="xs" x="-10" y="145" text-anchor="end">c₃</text><text class="xs" x="-10" y="185" text-anchor="end">n</text>
+  <g stroke="var(--line)" fill="none"><rect x="0" y="0" width="200" height="200"/></g>
+  <g class="cells">
+   <rect class="warm" x="0" y="0" width="40" height="40"/>
+   <rect class="warm" x="0" y="40" width="40" height="40"/><rect class="violet" x="40" y="40" width="40" height="40"/>
+   <rect class="warm" x="0" y="80" width="40" height="40"/><rect class="violet" x="40" y="80" width="40" height="40"/><rect class="violet" x="80" y="80" width="40" height="40"/>
+   <rect class="warm" x="0" y="120" width="40" height="40"/><rect class="violet" x="40" y="120" width="40" height="40"/><rect class="violet" x="80" y="120" width="40" height="40"/><rect class="violet" x="120" y="120" width="40" height="40"/>
+   <rect class="warm" x="0" y="160" width="40" height="40"/><rect class="violet" x="40" y="160" width="40" height="40"/><rect class="violet" x="80" y="160" width="40" height="40"/><rect class="violet" x="120" y="160" width="40" height="40"/><rect class="blue" x="160" y="160" width="40" height="40"/>
+  </g>
+  <text class="xs" x="100" y="218" text-anchor="middle">行 = Query 块，列 = Key 块；块内双向</text>
+ </g>
+ <text class="xs" x="860" y="287" text-anchor="middle">Teacher 是整段双向（满矩阵）</text>
+</svg>
+<figcaption><b>图 3　有界上下文。</b> (a) 参考 token 永远保留，历史只留最近 W 块，更早的被驱逐，所以计算和显存不随对话时长增长 <span class="tag b">博客</span>。时间位置做重映射，让窗口内位置不超出训练分布 <span class="tag i">推断·中</span>。(b) 块因果 mask：每块只能看参考和过去，teacher 则是整段双向。</figcaption>
+</figure>
+<ul>
+<li><span class="tag b">博客</span> 每块 8 帧，块内最新 latent 作为下一块条件；固定长度 KV cache；memory-aware positional encodings。</li>
+<li><span class="tag i">推断·中</span> 「memory-aware」最可能的含义：RoPE 的时间索引不是全局帧号，而是相对于窗口的位置，参考 token 用固定的特殊位置。否则跑 10 分钟后位置索引远超训练长度，画面会崩。StreamingLLM 的 attention sink + 位置重排是同一思路。</li>
+<li><span class="tag i">推断</span> 块大小是延迟与质量的权衡：块越小首帧越快、越跟手，但每块的固定开销（参考与窗口 attention）占比越高，时序连贯也更难。8 帧 = 2 latent 帧，接近最小合理单位。</li>
+</ul>
+
+<h2 id="train">6. 训练流程与损失</h2>
+<figure>
+<svg viewBox="0 0 1040 200" role="img" aria-label="训练阶段">
+ <g>
+  <rect class="box dash" x="10" y="20" width="180" height="150" rx="10"/>
+  <text class="ttl" x="100" y="48" text-anchor="middle">① 视频基座预训练</text>
+  <text class="sm" x="100" y="78" text-anchor="middle">通用 image-to-video DiT</text>
+  <text class="sm" x="100" y="100" text-anchor="middle">海量视频 + 图像</text>
+  <text class="sm" x="100" y="122" text-anchor="middle">可能源自 Movie Gen 系</text>
+  <text class="xs" x="100" y="156" text-anchor="middle" style="fill:var(--infer)">推断·高</text>
+ </g>
+ <g>
+  <rect class="blue" x="218" y="20" width="180" height="150" rx="10"/>
+  <text class="ttl" x="308" y="48" text-anchor="middle">② 音频驱动 teacher</text>
+  <text class="sm" x="308" y="78" text-anchor="middle">双向注意力</text>
+  <text class="sm" x="308" y="100" text-anchor="middle">条件：VQ + 参考 + 上下文</text>
+  <text class="sm" x="308" y="122" text-anchor="middle">40 步 · 三路 CFG</text>
+  <text class="xs" x="308" y="156" text-anchor="middle" style="fill:var(--blog)">博客</text>
+ </g>
+ <g>
+  <rect class="box dash" x="426" y="20" width="180" height="150" rx="10"/>
+  <text class="ttl" x="516" y="48" text-anchor="middle">③ 因果化初始化</text>
+  <text class="sm" x="516" y="78" text-anchor="middle">换成块因果 mask</text>
+  <text class="sm" x="516" y="100" text-anchor="middle">回归 teacher ODE 轨迹</text>
+  <text class="sm" x="516" y="122" text-anchor="middle">（CausVid 的做法）</text>
+  <text class="xs" x="516" y="156" text-anchor="middle" style="fill:var(--infer)">推断·中</text>
+ </g>
+ <g>
+  <rect class="green" x="634" y="20" width="180" height="150" rx="10" style="stroke-width:2.2"/>
+  <text class="ttl" x="724" y="48" text-anchor="middle">④ Self-Forcing + DMD</text>
+  <text class="sm" x="724" y="78" text-anchor="middle">用自己生成的历史 rollout</text>
+  <text class="sm" x="724" y="100" text-anchor="middle">分布匹配 teacher（含 CFG）</text>
+  <text class="sm" x="724" y="122" text-anchor="middle">→ 2 步、无 guidance</text>
+  <text class="xs" x="724" y="156" text-anchor="middle" style="fill:var(--blog)">博客</text>
+ </g>
+ <g>
+  <rect class="warm" x="842" y="20" width="188" height="150" rx="10"/>
+  <text class="ttl" x="936" y="48" text-anchor="middle">⑤ 4-bit QAT</text>
+  <text class="sm" x="936" y="78" text-anchor="middle">量化感知微调</text>
+  <text class="sm" x="936" y="100" text-anchor="middle">FP4 推理（GB200）</text>
+  <text class="sm" x="936" y="122" text-anchor="middle">+ CUDA Graph / 融合 kernel</text>
+  <text class="xs" x="936" y="156" text-anchor="middle" style="fill:var(--blog)">博客</text>
+ </g>
+ <path class="arr" d="M190 95 H216" marker-end="url(#ah)"/><path class="arr" d="M398 95 H424" marker-end="url(#ah)"/><path class="arr" d="M606 95 H632" marker-end="url(#ah)"/><path class="arr" d="M814 95 H840" marker-end="url(#ah)"/>
+ <text class="xs" x="516" y="192" text-anchor="middle">质量来自 teacher（②），速度来自蒸馏（③④）和量化（⑤）</text>
+</svg>
+<figcaption><b>图 4　推断的训练阶段。</b> ②④⑤ 博客明确提到，①③ 是按 CausVid / Self-Forcing 论文的标准流程补全的。</figcaption>
+</figure>
+
+<h3>6.1 Teacher：flow matching + 三路 CFG</h3>
+<p><span class="tag i">推断·中</span> 训练目标大概率是 flow matching（Movie Gen 同款）。记干净 latent 为 \(x_0\)，噪声 \(\epsilon\)，条件 \(c=(r,a,h)\) 分别是参考、语音、历史：</p>
+$$x_t=(1-t)\,x_0+t\,\epsilon,\qquad \mathcal L_{\text{FM}}=\mathbb E_{t,x_0,\epsilon}\big\|v_\theta(x_t,t,c)-(\epsilon-x_0)\big\|^2$$
+<p>训练时随机丢弃参考和语音条件，推理时用 <span class="tag b">博客</span> 的「三路 CFG，每步 3 次前向」。最可能的分解（与 OmniHuman、Hallo3 的多条件 CFG 一致）：</p>
+$$\hat v=v(\varnothing,\varnothing)+s_r\big[v(r,\varnothing)-v(\varnothing,\varnothing)\big]+s_a\big[v(r,a)-v(r,\varnothing)\big]$$
+<p>\(s_r\) 控制身份保持强度，\(s_a\) 控制口型 / 表情跟随语音的强度。40 步 × 3 = 每块 120 次前向，正是博客说的 120 NFE。</p>
+
+<h3>6.2 Student：Self-Forcing + DMD</h3>
+<table>
+<tr><th></th><th>Teacher</th><th>Student</th></tr>
+<tr><td>注意力</td><td>双向（看整段）</td><td>块因果 + 定长 KV cache</td></tr>
+<tr><td>采样步数</td><td>40</td><td>2</td></tr>
+<tr><td>CFG</td><td>三路，每步 3 次前向</td><td>无（已蒸进权重）</td></tr>
+<tr><td>每块 NFE</td><td>120</td><td>2</td></tr>
+<tr><td>人类偏好</td><td>45%</td><td><b>55%</b></td></tr>
+</table>
+<p><b>DMD</b>（Yin et al., 2024）不让学生回归 teacher 的轨迹，而是让学生生成的<b>分布</b>与 teacher 一致。训练时维护两个 score 网络：冻结的 real score（teacher，带 CFG）和在线训练的 fake score（拟合学生当前分布）。学生 \(G_\theta\) 的梯度近似为：</p>
+$$\nabla_\theta\mathcal L_{\text{DMD}}\approx\mathbb E_{t,\,\hat x=G_\theta(z)}\Big[\big(s_{\text{fake}}(\hat x_t,t)-s_{\text{real}}^{\text{CFG}}(\hat x_t,t)\big)\,\frac{\partial \hat x}{\partial\theta}\Big]$$
+<p>CFG 只在 real score 里用，学生就学到了「带 guidance 的分布」，所以推理时不再需要 CFG，这对应博客说的 jointly distilled CFG。</p>
+<p><b>Self-Forcing</b>（Huang et al., 2025）解决自回归的 exposure bias：训练时学生<b>真的按推理方式</b>逐块生成，第 n 块的上下文用的是自己前面生成的块（而不是真实视频），然后在整段 rollout 上算 DMD 损失。这样训练和推理看到的历史分布一致，长时间运行不会越跑越崩。博客原话就是「在学生自己生成的上下文上训练以抵抗漂移」。</p>
+<p>2 步 student 反而略胜 40 步 teacher，与 DMD 系列论文的观察一致：分布匹配去掉了高 CFG 带来的过饱和，画面更自然。</p>
+
+<h2 id="rt">7. 如何做到 25 fps</h2>
+<ul>
+<li>25 fps → 每帧 40 ms 预算；每块 8 帧对应 320 ms 播放时长。</li>
+<li><span class="tag b">博客</span> 单会话在 GB200 上：每块 20 ms，等效每帧 2.5 ms；相对「2 步 BF16 基线」吞吐提升 8×，一张 GB200 跑 12 路实时会话。</li>
+<li><span class="tag i">推断</span> 单会话 20–40 ms 对 320 ms 播放，约 8–16× 实时余量，这个余量就是拿去做多路并发的。</li>
+</ul>
+<h3>系统与 kernel 工程 <span class="tag b">博客列出</span>，细节 <span class="tag i">推断</span></h3>
+<ul>
+<li><b>4-bit QAT</b>：GB200 是 Blackwell，原生支持 FP4（NVFP4）tensor core；QAT 让 4-bit 下画质不掉，大概贡献了 8× 吞吐里的大头。</li>
+<li><b>持久化 KV cache</b>：会话常驻显存；<b>cache-aware routing</b> 把同一会话的请求固定路由到持有其 cache 的 GPU。</li>
+<li><b>latency-aware 动态 batching</b>：多路会话的块拼 batch，同时保证每路不超实时截止时间。</li>
+<li><b>融合 kernel + CUDA Graph</b>：2 步、小 batch 推理本来被 kernel launch 开销主导，CUDA Graph 把整段前向录成图一次提交。</li>
+<li>与 NVIDIA 联合优化；自研实时视频引擎；端到端音视频编排。</li>
+</ul>
+<h3>870 ms 大致怎么分配 <span class="tag i">推断·低</span></h3>
+<table>
+<tr><th>环节</th><th>估计</th></tr>
+<tr><td>端点检测（判断用户说完）</td><td>100–300 ms</td></tr>
+<tr><td>LLM 首 token + Voice 首批语音 token</td><td>200–400 ms</td></tr>
+<tr><td>Avatar 首块（2 次前向 + VAE 解码）</td><td>30–60 ms</td></tr>
+<tr><td>水印、编码、网络</td><td>50–150 ms</td></tr>
+</table>
+<p>视频生成只占很小一部分，瓶颈在对话侧。这也说明蒸馏到 2 步就够了，没必要再追 1 步。</p>
+
+<h2 id="lip">8. 口型、表情与肢体</h2>
+<ul>
+<li><b>口型</b> <span class="tag b">博客</span> 靠共享 token 流实现音、唇、表情同步，lip sync 维度优于 Runway Characters 和 HeyGen LiveAvatar。<span class="tag i">推断</span> 没有显式 viseme / blendshape / 3DMM，是 DiT 从 token 到像素端到端学的。teacher 双向能看到未来音频，学到了提前张嘴等协同发音规律，蒸馏后 student 继承这种分布。</li>
+<li><b>表情 / 情绪</b> <span class="tag b">博客</span> token 携带 delivery，表情强度随说话方式变化；没有显式情绪控制接口。</li>
+<li><b>肢体</b> <span class="tag b">博客</span> 全身插画会做手势、换姿态。<span class="tag i">推断·高</span> 同样没有骨骼 / SMPL 中间表示，手势是从大量带音频的人体视频中隐式学到的 co-speech gesture 分布。mannerism 维度对 Runway 打平，说明这里还不是强项。</li>
+<li><b>沉默 / 倾听</b> <span class="tag i">推断</span> 无语音时 token 流应是静音 token，模型生成眨眼、轻微晃动等 idle 动作。是否对用户说话做「倾听反应」博客没说；Meta FAIR 的 Seamless Interaction 专门研究过双人对话中的倾听行为。</li>
+</ul>
+
+<h2 id="data">9. 训练数据（博客完全未提，以下全为推断）</h2>
+<ol>
+<li><b>视频基座预训练</b> <span class="tag i">高</span>：能让动物、物体、插画「说话」，说明底座是在海量通用视频上预训练的 image-to-video 模型（Meta 有 Movie Gen，以及 MoCha 这类语音驱动角色的工作），而不是只在人脸数据上训练的专用模型。</li>
+<li><b>说话人 / 全身说话视频</b> <span class="tag i">高</span>：数千到数万小时带同步音频的单人视频（访谈、vlog、讲课），覆盖头肩到全身；需要过滤 A/V 不同步、多人、镜头切换、字幕遮挡。</li>
+<li><b>Meta 自有对话数据</b> <span class="tag i">中</span>：FAIR 2025 年开源的 Seamless Interaction 数据集（4000+ 小时面对面双人对话，arXiv:2506.22554）正好覆盖自然对话中的表情、手势、倾听反应。</li>
+<li><b>风格化数据</b> <span class="tag i">中</span>：动漫 / 插画 / 3D 角色的说话视频或合成数据。</li>
+<li><b>条件构造</b>：所有训练视频的音频都要过一遍 Muse Voice 的 tokenizer 得到 VQ token。</li>
+<li><b>蒸馏阶段</b>：DMD / Self-Forcing 主要依赖 teacher 分布，基本不需要配对真实视频（DMD2 可额外加 GAN 损失，用少量真实数据提升质量）。</li>
+</ol>
+
+<h2 id="eval">10. 效果与评测 <span class="tag b">博客</span></h2>
+<ul>
+<li>对比 Runway Characters、HeyGen LiveAvatar，各自用原生实时通话产品，评测者进行 2–3 分钟对话，身份匹配。</li>
+<li>总体偏好：<b>78% vs 22%</b>（对 Runway），<b>88% vs 12%</b>（对 HeyGen）。</li>
+<li>面部表现力、动作自然度、口型、角色保持、小动作各维度全部领先，只有 mannerism 对 Runway 统计上打平。</li>
+<li>评测图和示例视频见 <a href="https://research.meta.ai/blog/bringing-your-muse-to-life">原文</a>。</li>
+</ul>
+
+<h2 id="related">11. 相关工作与研究要点</h2>
+<table>
+<tr><th>工作</th><th>关系</th></tr>
+<tr><td>CausVid（CVPR 2025）</td><td>双向 teacher → 块因果少步 student 的 DMD 蒸馏框架，Muse 的直接方法来源</td></tr>
+<tr><td>Self-Forcing（2025）</td><td>自生成上下文训练，解决自回归漂移；博客点名使用</td></tr>
+<tr><td>DMD / DMD2（2024）</td><td>分布匹配蒸馏 + CFG 蒸馏；博客点名使用</td></tr>
+<tr><td>Meta MoCha（2025）</td><td>语音 + 文本驱动的 talking characters，可能的技术前身</td></tr>
+<tr><td>Meta Movie Gen（2024）</td><td>视频基础模型与时空 VAE，可能的底座</td></tr>
+<tr><td>Seamless Interaction（2025）</td><td>双人对话动作数据与模型，可能的数据来源</td></tr>
+<tr><td>Audio2Photoreal / Codec Avatars</td><td>另一条路线：音频 → 3D 动作 → 神经渲染；Muse 没走这条</td></tr>
+<tr><td>OmniHuman、Hallo3</td><td>非实时的音频驱动 DiT 数字人，多条件 CFG 思路相似</td></tr>
+</table>
+<h3>要点</h3>
+<ol>
+<li><b>token 级耦合最值得借鉴</b>：只要自己控制 TTS，就可以把离散 token 直接当驱动信号，比波形特征延迟更低、同步更好。</li>
+<li><b>质量来自 teacher，速度来自蒸馏</b>：先不计成本做强 teacher，再用 Self-Forcing + DMD 压到 2 步因果。</li>
+<li><b>有界上下文 + 参考锚点</b> 是无限长生成的关键，位置编码要专门处理。</li>
+<li><b>端到端延迟瓶颈在对话侧</b>，视频侧做到 2 步后更多是吞吐 / 成本问题。</li>
+<li><b>开放问题</b>：语音 token 码率与码本结构、是否有 look-ahead、是否建模倾听状态、参数量、VAE 压缩率、训练数据规模。</li>
+</ol>
+
+<h2>参考来源</h2>
+<ul>
+<li>Meta 博客：<a href="https://research.meta.ai/blog/bringing-your-muse-to-life">Bringing your Muse to life</a>（2026-09-23）</li>
+<li>发布报道：<a href="https://unite.ai/meta-brings-real-time-voice-and-expressive-avatars-to-muse">Unite.AI</a>（2026-11-05）</li>
+<li>Self Forcing：<a href="https://arxiv.org/abs/2506.08009">arXiv:2506.08009</a></li>
+<li>Seamless Interaction：<a href="https://arxiv.org/abs/2506.22554">arXiv:2506.22554</a></li>
+<li>DynaForcing（流式数字人 Self-Forcing 变体）：<a href="https://arxiv.org/pdf/2608.17707">arXiv:2608.17707</a></li>
+<li>Meta Video Seal：<a href="https://aidemos.meta.com/videoseal/">demo</a></li>
+<li>CausVid、DMD / DMD2、MoCha、Movie Gen、Audio2Photoreal 凭已有知识引用，未逐一重新核对。</li>
+</ul>
+<p class="meta">图均为自绘示意，非 Meta 官方。</p>
+</div>
