@@ -420,7 +420,96 @@ $$\nabla_\theta\mathcal L_{\text{DMD}}\approx\mathbb E_{t,\,\hat x=G_\theta(z)}\
 </table>
 <p>视频生成只占很小一部分，瓶颈在对话侧。这也说明蒸馏到 2 步就够了，没必要再追 1 步。</p>
 
-<h2 id="lip">8. 口型、表情与肢体</h2>
+<h2 id="rt-deep">8. 实时性深挖：为什么问完一两秒就开始回答</h2>
+<p>先说结论：Muse 的低延迟不是靠某一个模型特别快，而是<b>整条链路从头到尾都是流式的</b>，每一级拿到一点输入就开始干活，不等上一级把一整句话做完。视频模型在这条链路里其实是最便宜的一环。下面分五点拆开说。</p>
+
+<h3>8.1 是 token 级流式，不是「一句一句」</h3>
+<p>你的理解是对的。<span class="tag b">博客</span> 原文的说法是三者「组成一个单一的流式系统」（a single streaming system），Realtime Voice「产出一条语音 token 流」，音频解码器和 Avatar 模型「消费同一条流」。所以不存在「语音模型先生成整句、再交给视频模型」这一步。</p>
+<ul>
+<li>Avatar 每块需要 8 帧，也就是 320 ms 语音对应的 token。只要 Voice 吐出了这 320 ms 的 token，第一块视频就可以开算，不用等整句话。</li>
+<li>语音 token 的生成速度远快于播放速度（语音模型一般是几倍到十几倍实时），所以「攒够 320 ms 的 token」本身只需要几十毫秒。</li>
+<li>Avatar 算一块要 20 ms <span class="tag b">博客</span>，加上 VAE 解码，第一块视频在拿到 token 后几十毫秒内就能出来，和音频解码基本同时完成。</li>
+</ul>
+<p>换句话说，加上数字人画面之后，比纯语音对话只多了几十到一百毫秒左右 <span class="tag i">推断·中</span>。</p>
+
+<figure>
+<svg viewBox="0 0 1040 360" role="img" aria-label="一次回复的流式时间线">
+ <text class="sm" x="537" y="18" text-anchor="middle">⟵ 约 870 ms（博客）：用户说完 → 首个音视频字节 ⟶</text>
+ <path d="M320 26 V32 H755 V26" fill="none" stroke="var(--fg)" stroke-width="1.2"/>
+ <line x1="320" y1="36" x2="320" y2="322" stroke="var(--muted)" stroke-dasharray="4 4"/>
+ <line x1="755" y1="36" x2="755" y2="322" stroke="var(--green)" stroke-dasharray="4 4"/>
+ <text class="lbl" x="10" y="62">用户说话</text>
+ <rect class="io" x="120" y="47" width="200" height="22" rx="4"/><text class="xs" x="220" y="62" text-anchor="middle">…最后一句</text>
+ <text class="lbl" x="10" y="96">端点检测</text>
+ <rect class="box dash" x="320" y="81" width="100" height="22" rx="4"/><text class="xs" x="370" y="96" text-anchor="middle">判断说完</text>
+ <text class="lbl" x="10" y="130">Muse LLM</text>
+ <rect class="grey" x="420" y="115" width="125" height="22" rx="4"/><text class="xs" x="482" y="130" text-anchor="middle">首 token</text>
+ <rect class="grey" x="545" y="115" width="475" height="22" rx="4" opacity=".55"/><text class="xs" x="780" y="130" text-anchor="middle">边想边流式输出</text>
+ <text class="lbl" x="10" y="164">语音 token</text>
+ <rect class="violet" x="545" y="149" width="475" height="22" rx="4"/>
+ <g stroke="var(--violet)" stroke-width="1"><line x1="560" y1="152" x2="560" y2="168"/><line x1="575" y1="152" x2="575" y2="168"/><line x1="590" y1="152" x2="590" y2="168"/><line x1="605" y1="152" x2="605" y2="168"/><line x1="620" y1="152" x2="620" y2="168"/><line x1="635" y1="152" x2="635" y2="168"/></g>
+ <text class="xs" x="800" y="164" text-anchor="middle">比实时快，提前攒出未来几百 ms</text>
+ <text class="lbl" x="10" y="198">Avatar DiT</text>
+ <rect class="grey" x="120" y="183" width="10" height="22"/><rect class="grey" x="280" y="183" width="10" height="22"/><rect class="grey" x="440" y="183" width="10" height="22"/>
+ <text class="xs" x="205" y="223" text-anchor="middle">待机 / 倾听动作持续生成</text>
+ <rect class="blue" x="580" y="183" width="12" height="22"/><rect class="blue" x="740" y="183" width="12" height="22"/><rect class="blue" x="900" y="183" width="12" height="22"/>
+ <text class="xs" x="600" y="223">每块 8 帧，算 20 ms</text>
+ <text class="lbl" x="10" y="250">音频解码</text>
+ <rect class="box" x="580" y="235" width="12" height="22"/><rect class="box" x="740" y="235" width="12" height="22"/><rect class="box" x="900" y="235" width="12" height="22"/>
+ <text class="lbl" x="10" y="284">编码 / 网络</text>
+ <rect class="green dash" x="600" y="269" width="155" height="22" rx="4"/><text class="xs" x="677" y="284" text-anchor="middle">水印 · 编码 · 推流</text>
+ <text class="lbl" x="10" y="318">手机播放</text>
+ <rect class="blue" x="755" y="303" width="160" height="22" rx="4"/><text class="xs" x="835" y="318" text-anchor="middle">块 1 · 320 ms</text>
+ <rect class="blue" x="915" y="303" width="105" height="22" rx="4" opacity=".7"/><text class="xs" x="967" y="318" text-anchor="middle">块 2 …</text>
+ <g class="mono"><text x="120" y="348" text-anchor="middle">−400</text><text x="320" y="348" text-anchor="middle">0</text><text x="420" y="348" text-anchor="middle">200</text><text x="520" y="348" text-anchor="middle">400</text><text x="620" y="348" text-anchor="middle">600</text><text x="720" y="348" text-anchor="middle">800</text><text x="820" y="348" text-anchor="middle">1000</text><text x="920" y="348" text-anchor="middle">1200</text><text x="1015" y="348" text-anchor="end">ms</text></g>
+ <line x1="120" y1="334" x2="1020" y2="334" stroke="var(--line)"/>
+</svg>
+<figcaption><b>图 5　一次回复的流式时间线（示意，各段时长为推断）。</b> 横轴以用户说完为 0。只有 870 ms 总数和「每块 8 帧、算 20 ms」来自博客。可以看到 Avatar 和音频解码只是时间线上的几个细条，大头在端点检测、LLM 首 token 和网络。</figcaption>
+</figure>
+
+<h3>8.2 870 ms 花在哪：视频几乎不占时间</h3>
+<p>§7 的表里粗估过：端点检测 100–300 ms，LLM 首 token 加语音首批 token 200–400 ms，Avatar 首块 30–60 ms，水印、编码、网络 50–150 ms <span class="tag i">推断·低</span>。视频部分只占 5% 左右。所以你感觉到的「快」，主要功劳在对话侧，Muse 在视频侧做的事情是<b>不拖后腿</b>。</p>
+<p>对话侧常见的几个提速手段（行业通用做法，Meta 没有公开 Muse 具体用了哪些）<span class="tag i">推断·中</span>：</p>
+<ul>
+<li><b>预测式端点检测</b>：不是等用户静音 500 ms 再判断说完，而是用模型根据语义和语调提前判断「这句话说完了」，甚至在用户还没说完时就开始预先生成回答，说完了就直接用，没说完就丢掉。</li>
+<li><b>LLM 流式输出</b>：LLM 一边生成，下游一边消费；回复的第一小段一出来语音就开始合成，不等整段回答。</li>
+<li><b>语音模型的形态</b>：如果 Realtime Voice 是端到端的语音大模型（直接从对话生成语音 token），还能省掉「文本 → TTS」这一跳。新闻报道只确认了可以随时打断、有上百种音色，没有公开它是端到端还是 LLM + TTS 的级联。</li>
+</ul>
+
+<h3>8.3 一个容易忽略的点：视频流从来不停</h3>
+<p><span class="tag b">博客</span> 说生成「随对话持续进行」，模型带着滚动窗口一直往下生成。<span class="tag i">推断·中</span> 这意味着用户说话时，Avatar 也在持续生成待机、倾听的画面（眨眼、轻微晃动），视频流和推流通道一直是热的。轮到它说话时，只是输入的语音 token 从「静音」变成了「有内容」，不存在「启动模型、建连接、加载参考图」这些冷启动开销。参考图 token 在会话开始时就已经算好放在 KV cache 里了。</p>
+
+<h3>8.4 look-ahead 几乎是免费的</h3>
+<p>这是语音 token 驱动相对于麦克风音频驱动的一个大优势 <span class="tag i">推断·中</span>。人说话时嘴型比声音早，口型模型最好能看到未来几百毫秒的音频。</p>
+<ul>
+<li>对比：公开的流式数字人论文 AvatarForcing（快手可灵等，2026）用真实音频驱动，为了看未来要额外等 0.48 s，总延迟 0.51 s 里绝大部分就是这个 look-ahead。</li>
+<li>Muse 的音频是自己的语音模型生成的，而且生成得比播放快。所以生成第 n 块视频时，后面几百毫秒的 token 往往已经存在了，看未来<b>不额外增加延迟</b>，只有每次回复的第一块需要等一下。博客没说用没用，但从设计上看很顺手。</li>
+</ul>
+
+<h3>8.5 算力账：一张卡 12 路是怎么算出来的</h3>
+<ul>
+<li>单路：每 320 ms 的播放量只需要 20 ms 计算 <span class="tag b">博客</span>，即 16 倍实时余量。</li>
+<li>12 路：12 × 20 ms = 240 ms，占 320 ms 的 75% <span class="tag i">推断</span>。剩下 25% 留给批处理调度和截止时间抖动。这和博客「latency-aware 动态 batching」对得上：要在保证每一路都不超过 320 ms 截止时间的前提下，尽量把 GPU 填满。</li>
+<li>为什么 2 步就停、不追 1 步：视频侧已经只占 870 ms 的几十毫秒了，再砍一步对用户感受几乎没影响，主要收益是成本。扎克伯格在 10 月财报会上提到 Muse 还没全球推出是因为算力太贵（据 ppc.land 转述），说明现在的优化重点是吞吐和成本，不是延迟。</li>
+</ul>
+
+<h3>8.6 和公开的实时数字人系统对比</h3>
+<table>
+<tr><th>系统</th><th>机构</th><th>步数</th><th>速度 / 延迟</th><th>音频条件</th></tr>
+<tr><td><b>Muse Realtime Avatar</b></td><td>Meta</td><td>2（无 CFG）</td><td>2.5 ms/帧（GB200），端到端 870 ms，448×768@25fps</td><td>语音模型的 VQ token</td></tr>
+<tr><td>AvatarForcing <a href="https://arxiv.org/abs/2603.14331">2603.14331</a></td><td>浙大 / 快手可灵等</td><td>1</td><td>34 ms/帧，延迟 0.51 s（含 0.48 s look-ahead），832×480@25fps</td><td>流式 Wav2Vec</td></tr>
+<tr><td>LiveTalk <a href="https://arxiv.org/abs/2512.23576">2512.23576</a></td><td>上海交大 GAIR 等</td><td>4</td><td>首帧 0.33 s，24.8 fps，512×512；多轮平均每轮 1.16 s</td><td>Qwen3-Omni 流式语音输出</td></tr>
+<tr><td>FlowAct-R1 <a href="https://arxiv.org/abs/2601.10103">2601.10103</a></td><td>字节跳动</td><td>3</td><td>首帧约 1.5 s（A100），480p@25fps，FP8</td><td>Whisper 特征</td></tr>
+</table>
+<p>这几篇都不是 Meta 的，也都没有提到 Muse，放在这里只是作为同类技术的参照。它们的共同点和 Muse 一致：双向 teacher 蒸馏成少步因果 student（Self-Forcing / DMD 系），参考图做 attention sink，滚动 KV cache，DiT 和 VAE 解码流水线并行。Muse 领先的地方在于每帧算力低一个数量级（FP4 + 2 步 + 大量 kernel 工程），以及用语音 token 而不是音频特征，省掉了音频编码器和 look-ahead 等待。LiveTalk 是最接近 Muse 整体形态的公开系统：同样是「语音大模型流式输出 → 视频模型」的级联，值得细读。</p>
+
+<h3>8.7 哪些是确定的，哪些还不知道</h3>
+<ul>
+<li><b>确定</b>：token 级流式共享、每块 8 帧 20 ms、870 ms 端到端、2 步因果 student、12 路 / GB200、可随时打断、上百种音色。</li>
+<li><b>没有公开</b>：Realtime Voice 是端到端还是级联、语音 token 的码率和码本、是否用 look-ahead、端点检测怎么做、推流协议。Meta 没有发论文或模型卡，新闻报道里也没有研究员的采访细节。</li>
+</ul>
+
+<h2 id="lip">9. 口型、表情与肢体</h2>
 <ul>
 <li><b>口型</b> <span class="tag b">博客</span> 靠共享 token 流实现音、唇、表情同步，lip sync 维度优于 Runway Characters 和 HeyGen LiveAvatar。<span class="tag i">推断</span> 没有显式 viseme / blendshape / 3DMM，是 DiT 从 token 到像素端到端学的。teacher 双向能看到未来音频，学到了提前张嘴等协同发音规律，蒸馏后 student 继承这种分布。</li>
 <li><b>表情 / 情绪</b> <span class="tag b">博客</span> token 携带 delivery，表情强度随说话方式变化；没有显式情绪控制接口。</li>
@@ -428,7 +517,7 @@ $$\nabla_\theta\mathcal L_{\text{DMD}}\approx\mathbb E_{t,\,\hat x=G_\theta(z)}\
 <li><b>沉默 / 倾听</b> <span class="tag i">推断</span> 无语音时 token 流应是静音 token，模型生成眨眼、轻微晃动等 idle 动作。是否对用户说话做「倾听反应」博客没说；Meta FAIR 的 Seamless Interaction 专门研究过双人对话中的倾听行为。</li>
 </ul>
 
-<h2 id="data">9. 训练数据（博客完全未提，以下全为推断）</h2>
+<h2 id="data">10. 训练数据（博客完全未提，以下全为推断）</h2>
 <ol>
 <li><b>视频基座预训练</b> <span class="tag i">高</span>：能让动物、物体、插画「说话」，说明底座是在海量通用视频上预训练的 image-to-video 模型（Meta 有 Movie Gen，以及 MoCha 这类语音驱动角色的工作），而不是只在人脸数据上训练的专用模型。</li>
 <li><b>说话人 / 全身说话视频</b> <span class="tag i">高</span>：数千到数万小时带同步音频的单人视频（访谈、vlog、讲课），覆盖头肩到全身；需要过滤 A/V 不同步、多人、镜头切换、字幕遮挡。</li>
@@ -438,7 +527,7 @@ $$\nabla_\theta\mathcal L_{\text{DMD}}\approx\mathbb E_{t,\,\hat x=G_\theta(z)}\
 <li><b>蒸馏阶段</b>：DMD / Self-Forcing 主要依赖 teacher 分布，基本不需要配对真实视频（DMD2 可额外加 GAN 损失，用少量真实数据提升质量）。</li>
 </ol>
 
-<h2 id="eval">10. 效果与评测 <span class="tag b">博客</span></h2>
+<h2 id="eval">11. 效果与评测 <span class="tag b">博客</span></h2>
 <ul>
 <li>对比 Runway Characters、HeyGen LiveAvatar，各自用原生实时通话产品，评测者进行 2–3 分钟对话，身份匹配。</li>
 <li>总体偏好：<b>78% vs 22%</b>（对 Runway），<b>88% vs 12%</b>（对 HeyGen）。</li>
@@ -446,10 +535,10 @@ $$\nabla_\theta\mathcal L_{\text{DMD}}\approx\mathbb E_{t,\,\hat x=G_\theta(z)}\
 <li>评测图和示例视频见 <a href="https://research.meta.ai/blog/bringing-your-muse-to-life">原文</a>。</li>
 </ul>
 
-<h2 id="related">11. 相关工作与研究要点</h2>
+<h2 id="related">12. 相关工作与研究要点</h2>
 <table>
 <tr><th>工作</th><th>关系</th></tr>
-<tr><td>CausVid（CVPR 2025）</td><td>双向 teacher → 块因果少步 student 的 DMD 蒸馏框架，Muse 的直接方法来源</td></tr>
+<tr><td>CausVid（CVPR 2025）</td><td>博客未提。双向 teacher → 块因果少步 student 的 DMD 蒸馏框架，Muse 的直接方法来源</td></tr>
 <tr><td>Self-Forcing（2025）</td><td>自生成上下文训练，解决自回归漂移；博客点名使用</td></tr>
 <tr><td>DMD / DMD2（2024）</td><td>分布匹配蒸馏 + CFG 蒸馏；博客点名使用</td></tr>
 <tr><td>Meta MoCha（2025）</td><td>语音 + 文本驱动的 talking characters，可能的技术前身</td></tr>
@@ -468,14 +557,18 @@ $$\nabla_\theta\mathcal L_{\text{DMD}}\approx\mathbb E_{t,\,\hat x=G_\theta(z)}\
 </ol>
 
 <h2>参考来源</h2>
+<p><b>博客自己提到的</b>：博客没有引用任何论文，也没有 arXiv 链接和作者名。正文只点名了几个方法：self-forcing、distribution matching distillation、classifier-free guidance、Diffusion Transformer、NVIDIA CUDA Graph、4-bit 量化感知训练，都没有给链接。正文里的外链只有对比对象 <a href="https://runway.com/product/characters">Runway Characters</a>、<a href="https://www.liveavatar.com/">HeyGen LiveAvatar</a> 和 <a href="https://aidemos.meta.com/videoseal/">Meta Video Seal</a>。</p>
 <ul>
-<li>Meta 博客：<a href="https://research.meta.ai/blog/bringing-your-muse-to-life">Bringing your Muse to life</a>（2026-09-23）</li>
-<li>发布报道：<a href="https://unite.ai/meta-brings-real-time-voice-and-expressive-avatars-to-muse">Unite.AI</a>（2026-11-05）</li>
-<li>Self Forcing：<a href="https://arxiv.org/abs/2506.08009">arXiv:2506.08009</a></li>
+<li>Meta 博客：<a href="https://research.meta.ai/blog/bringing-your-muse-to-life">Bringing your Muse to life</a>（2026-09-23，署名 Meta AI Research）</li>
+</ul>
+<p><b>我补充的（博客没提，用来解释或对照）</b>：</p>
+<ul>
+<li>Self Forcing 论文：<a href="https://arxiv.org/abs/2506.08009">arXiv:2506.08009</a>（博客点了方法名，论文是我找的）</li>
+<li>DMD / DMD2、CausVid、Movie Gen、MoCha、Audio2Photoreal、OmniHuman、Hallo3：凭已有知识引用，未逐一核对</li>
 <li>Seamless Interaction：<a href="https://arxiv.org/abs/2506.22554">arXiv:2506.22554</a></li>
-<li>DynaForcing（流式数字人 Self-Forcing 变体）：<a href="https://arxiv.org/pdf/2608.17707">arXiv:2608.17707</a></li>
-<li>Meta Video Seal：<a href="https://aidemos.meta.com/videoseal/">demo</a></li>
-<li>CausVid、DMD / DMD2、MoCha、Movie Gen、Audio2Photoreal 凭已有知识引用，未逐一重新核对。</li>
+<li>DynaForcing：<a href="https://arxiv.org/pdf/2608.17707">arXiv:2608.17707</a></li>
+<li>AvatarForcing：<a href="https://arxiv.org/abs/2603.14331">arXiv:2603.14331</a> · LiveTalk：<a href="https://arxiv.org/abs/2512.23576">arXiv:2512.23576</a> · FlowAct-R1：<a href="https://arxiv.org/abs/2601.10103">arXiv:2601.10103</a></li>
+<li>新闻报道：<a href="https://unite.ai/meta-brings-real-time-voice-and-expressive-avatars-to-muse">Unite.AI</a>、<a href="https://ppc.land/metas-muse-gains-voice-and-avatars-in-the-us-not-yet-in-canada/">PPC Land</a>、<a href="https://www.datastudios.org/post/meta-muse-voice-conversations-expressive-avatars-us">DataStudios</a>、<a href="https://www.tokenpost.com/news/technology/51138">TokenPost</a></li>
 </ul>
 <p class="meta">图均为自绘示意，非 Meta 官方。</p>
 </div>
