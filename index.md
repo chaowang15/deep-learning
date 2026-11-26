@@ -51,4 +51,12 @@ description: "Deep learning technical notes and study blog."
     <span class="note-index-keywords">Seq2Seq and RNN review, attention, Transformer encoder-decoder flow, multi-head attention, loss design, and inference.</span>
     <span class="note-index-summary">这篇是对 Transformer 的系统学习记录，从 RNN/Seq2Seq 回顾开始，引出 Attention 和 Self-Attention，再展开 Encoder、Decoder、Multi-Head Attention、mask、loss design 和 inference。它会同时保留公式、图解和 PyTorch 风格代码，适合按流程复盘整个架构。</span>
   </a>
+  <a class="note-index-card" href="/deep-learning/muse-realtime-avatar/">
+    <span class="note-index-card-head">
+      <strong>Meta Muse Realtime Avatar 技术解析</strong>
+      <time datetime="2026-11">2026.11</time>
+    </span>
+    <span class="note-index-keywords">Audio-driven causal DiT, speech VQ tokens, KV cache, Self-Forcing, DMD distillation, real-time 25 fps inference.</span>
+    <span class="note-index-summary">拆解 Meta Muse 实时数字人的网络架构：语音 token 如何同时驱动声音和画面，块因果 DiT 每个模块的输入输出与张量形状，参考图锚点和滚动 KV cache，以及如何用 Self-Forcing + DMD 把 40 步 teacher 蒸馏成 2 步实时 student。配论文风格架构图，区分博客原文与推断。</span>
+  </a>
 </div>
