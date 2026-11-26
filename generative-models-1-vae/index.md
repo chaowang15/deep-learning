@@ -1,4 +1,9 @@
-﻿---
+---
+date: 2025-09-01 00:00:00 -0800
+keywords: >-
+  AutoEncoders, VAE derivation, reparameterization trick, Conv-VAE, and VQ-VAE references.
+summary: >-
+  这篇从 AutoEncoder 的直觉出发，解释为什么需要 latent distribution，并推导 VAE 的 ELBO、reconstruction term 和 KL regularization。后半部分连接到 PyTorch 实现、reparameterization trick、Conv-VAE，以及 VQ-VAE 相关工作。
 layout: note
 title: "Generative Models 1: VAE"
 description: "VAE derivation, ELBO, reparameterization trick, Conv-VAE, and VQ-VAE."

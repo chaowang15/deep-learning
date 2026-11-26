@@ -1,4 +1,9 @@
 ---
+date: 2026-01-01 00:00:00 -0800
+keywords: >-
+  GAN intuition, adversarial objectives, alternating training, generator/discriminator structure, and implementation flow.
+summary: >-
+  这篇关注 GAN 的核心思想：Generator 和 Discriminator 如何通过 adversarial training 相互推动。内容包括目标函数直觉、训练不稳定的原因、Generator/Discriminator 的代码结构，以及 alternating training 的实现细节。
 layout: note
 title: "Generative Models 2: GAN"
 description: "GAN objective, training flow, generator/discriminator structure, and implementation notes."

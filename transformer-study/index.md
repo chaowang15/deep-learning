@@ -1,4 +1,9 @@
 ---
+date: 2026-05-01 00:00:00 -0800
+keywords: >-
+  Seq2Seq and RNN review, attention, Transformer encoder-decoder flow, multi-head attention, loss design, and inference.
+summary: >-
+  这篇是对 Transformer 的系统学习记录，从 RNN/Seq2Seq 回顾开始，引出 Attention 和 Self-Attention，再展开 Encoder、Decoder、Multi-Head Attention、mask、loss design 和 inference。它会同时保留公式、图解和 PyTorch 风格代码，适合按流程复盘整个架构。
 layout: note
 title: "Transformer 学习 / Transformer Study"
 description: "Notes on seq2seq, attention, Transformer encoder-decoder architecture, multi-head attention, loss design, and inference."

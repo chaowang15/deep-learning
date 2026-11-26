@@ -1,4 +1,9 @@
 ---
+date: 2026-11-26 14:00:00 -0800
+keywords: >-
+  CFG distillation, Distribution Matching Distillation (DMD/DMD2), CausVid, Self-Forcing, 4-bit QAT, CUDA Graph, DiT.
+summary: >-
+  Muse 解析的配套笔记，把实时视频扩散用到的技术逐个展开：从 CFG 讲到 DMD 如何用两个 score 网络之差训练少步生成器，DMD2 的四个改进，CausVid 的双向到因果蒸馏，Self-Forcing 如何消除自回归的训练推理不一致，以及 4-bit 量化和 CUDA Graph。附论文、代码和建议的学习顺序。
 layout: note
 title: "实时视频扩散的关键技术：DMD、Self-Forcing 与推理加速"
 description: "Muse 实时数字人用到的关键技术逐个展开：CFG 与 CFG 蒸馏、DMD / DMD2 分布匹配蒸馏、CausVid、Self-Forcing、4-bit QAT、CUDA Graph 与 DiT，附论文、代码和学习顺序。"
