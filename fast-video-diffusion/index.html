@@ -1,0 +1,335 @@
+---
+layout: note
+title: "实时视频扩散的关键技术：DMD、Self-Forcing 与推理加速"
+description: "Muse 实时数字人用到的关键技术逐个展开：CFG 与 CFG 蒸馏、DMD / DMD2 分布匹配蒸馏、CausVid、Self-Forcing、4-bit QAT、CUDA Graph 与 DiT，附论文、代码和学习顺序。"
+---
+<style>
+.muse-note{--card:#fff;--fg:#202124;--muted:#667085;--line:#e6e8eb;--code:#f3f5f7;
+--accent:#2f5d8a;--accent-soft:#e6eef6;--warm:#b5651d;--warm-soft:#f8ece0;--green:#3f7a4f;--green-soft:#e5f1e7;
+--violet:#6a4c93;--violet-soft:#efe8f6;--blog:#2f5d8a;--infer:#b5651d;
+--sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;--mono:"SF Mono",Menlo,Consolas,monospace}
+.muse-note td.mono{font-family:var(--mono);font-size:13px;white-space:nowrap}
+.muse-note .meta{color:var(--muted);font-size:14px}
+.muse-note figure{max-width:none}
+.muse-note .tag{display:inline-block;font-size:12px;line-height:1;padding:4px 7px;border-radius:4px;vertical-align:2px;font-weight:600;white-space:nowrap}
+.muse-note .tag.b{background:var(--accent-soft);color:var(--blog)}
+.muse-note .tag.i{background:var(--warm-soft);color:var(--infer)}
+.muse-note .legend{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 16px;font-size:15px}
+.muse-note .tldr{background:var(--accent-soft);border-left:4px solid var(--accent);padding:14px 18px;border-radius:0 8px 8px 0}
+.muse-note .tldr ol{margin:.4em 0 0;padding-left:1.3em}
+.muse-note figure{margin:2em 0;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 18px 10px}
+.muse-note figure svg{width:100%;height:auto;display:block}
+.muse-note figcaption{font-size:14px;color:var(--muted);margin-top:10px;line-height:1.6}
+.muse-note figcaption b{color:var(--fg)}
+.muse-note svg text{font-family:var(--sans);fill:var(--fg)}
+.muse-note svg .sm{font-size:11.5px;fill:var(--muted)}
+.muse-note svg .xs{font-size:10.5px;fill:var(--muted)}
+.muse-note svg .mono{font-family:var(--mono);font-size:11px;fill:var(--muted)}
+.muse-note svg .ttl{font-size:14px;font-weight:700}
+.muse-note svg .lbl{font-size:13px;font-weight:600}
+.muse-note svg .box{fill:var(--card);stroke:var(--fg);stroke-width:1.3}
+.muse-note svg .io{fill:var(--code);stroke:var(--muted);stroke-width:1.2}
+.muse-note svg .blue{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.5}
+.muse-note svg .warm{fill:var(--warm-soft);stroke:var(--warm);stroke-width:1.5}
+.muse-note svg .green{fill:var(--green-soft);stroke:var(--green);stroke-width:1.5}
+.muse-note svg .violet{fill:var(--violet-soft);stroke:var(--violet);stroke-width:1.5}
+.muse-note svg .grey{fill:var(--code);stroke:var(--line);stroke-width:1.2}
+.muse-note svg .dash{stroke-dasharray:5 4}
+.muse-note svg .group{fill:none;stroke:var(--muted);stroke-width:1.1;stroke-dasharray:3 3}
+.muse-note svg .arr{fill:none;stroke:var(--fg);stroke-width:1.4}
+.muse-note svg .arr.a{stroke:var(--accent)}
+.muse-note svg .arr.w{stroke:var(--warm)}
+.muse-note svg .arr.g{stroke:var(--green)}
+.muse-note svg .arr.v{stroke:var(--violet)}
+.muse-note svg .ah{fill:var(--fg)}
+.muse-note svg .ah.a{fill:var(--accent)} .muse-note svg .ah.w{fill:var(--warm)} .muse-note svg .ah.g{fill:var(--green)} .muse-note svg .ah.v{fill:var(--violet)}
+</style>
+<div class="muse-note">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+ <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+ <marker id="ah-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah a" d="M0,0 L10,5 L0,10 z"/></marker>
+ <marker id="ah-w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah w" d="M0,0 L10,5 L0,10 z"/></marker>
+ <marker id="ah-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah g" d="M0,0 L10,5 L0,10 z"/></marker>
+ <marker id="ah-v" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah v" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs></svg>
+<div class="muse-note">
+<h1>实时视频扩散的关键技术：DMD、Self-Forcing 与推理加速</h1>
+<p class="meta">2026-11-26 · 配套 <a href="/deep-learning/muse-realtime-avatar/">Meta Muse Realtime Avatar 技术解析</a> · 把 Muse 博客点名的几项技术逐个展开，附论文、代码和学习顺序</p>
+
+<div class="legend">
+<b>这篇讲什么</b>：Meta 的 Muse 博客说它的实时数字人用了 <b>self-forcing</b>、<b>distribution matching distillation（DMD）</b>、<b>classifier-free guidance（CFG）</b>、<b>Diffusion Transformer</b>、<b>4-bit 量化感知训练</b>和 <b>CUDA Graph</b>，但没有引用任何论文。这篇按「为什么需要 → 核心思想 → 公式 → 论文与代码」把它们讲清楚。重点是 DMD 和 Self-Forcing，DiT 只做简介。
+</div>
+
+<h2 id="map">0. 技术地图</h2>
+<figure>
+<svg viewBox="0 0 1040 300" role="img" aria-label="少步蒸馏到流式视频的技术谱系">
+ <g class="sm" font-weight="700"><text x="105" y="22" text-anchor="middle">2022</text><text x="315" y="22" text-anchor="middle">2023</text><text x="525" y="22" text-anchor="middle">2024</text><text x="735" y="22" text-anchor="middle">2025</text><text x="945" y="22" text-anchor="middle">2026</text></g>
+ <rect class="box" x="20" y="40" width="170" height="40" rx="8"/><text class="lbl" x="105" y="58" text-anchor="middle">Classifier-Free Guidance</text><text class="mono" x="105" y="73" text-anchor="middle">2207.12598</text>
+ <rect class="box" x="20" y="110" width="170" height="40" rx="8"/><text class="lbl" x="105" y="128" text-anchor="middle">Guidance Distillation</text><text class="mono" x="105" y="143" text-anchor="middle">2210.03142</text>
+ <rect class="box" x="20" y="180" width="170" height="40" rx="8"/><text class="lbl" x="105" y="198" text-anchor="middle">SDS（DreamFusion）</text><text class="mono" x="105" y="213" text-anchor="middle">2209.14988</text>
+ <rect class="box" x="230" y="40" width="170" height="40" rx="8"/><text class="lbl" x="315" y="58" text-anchor="middle">Diff-Instruct</text><text class="mono" x="315" y="73" text-anchor="middle">2305.18455</text>
+ <rect class="green" x="230" y="110" width="170" height="40" rx="8" style="stroke-width:2.2"/><text class="lbl" x="315" y="128" text-anchor="middle">DMD</text><text class="mono" x="315" y="143" text-anchor="middle">2311.18828</text>
+ <rect class="box" x="230" y="180" width="170" height="40" rx="8"/><text class="lbl" x="315" y="198" text-anchor="middle">VSD（ProlificDreamer）</text><text class="mono" x="315" y="213" text-anchor="middle">2305.16213</text>
+ <rect class="green" x="440" y="110" width="170" height="40" rx="8"/><text class="lbl" x="525" y="128" text-anchor="middle">DMD2</text><text class="mono" x="525" y="143" text-anchor="middle">2405.14867</text>
+ <rect class="violet" x="440" y="180" width="170" height="40" rx="8"/><text class="lbl" x="525" y="198" text-anchor="middle">CausVid</text><text class="mono" x="525" y="213" text-anchor="middle">2412.07772</text>
+ <rect class="box" x="440" y="250" width="170" height="40" rx="8"/><text class="lbl" x="525" y="268" text-anchor="middle">Diffusion Forcing</text><text class="mono" x="525" y="283" text-anchor="middle">2407.01392</text>
+ <rect class="violet" x="650" y="180" width="170" height="40" rx="8" style="stroke-width:2.2"/><text class="lbl" x="735" y="198" text-anchor="middle">Self-Forcing</text><text class="mono" x="735" y="213" text-anchor="middle">2506.08009</text>
+ <rect class="violet" x="650" y="250" width="170" height="40" rx="8"/><text class="lbl" x="735" y="268" text-anchor="middle">Self-Forcing++</text><text class="mono" x="735" y="283" text-anchor="middle">2510.02283</text>
+ <rect class="blue" x="860" y="180" width="170" height="40" rx="8" style="stroke-width:2.2"/><text class="lbl" x="945" y="198" text-anchor="middle">Muse Realtime Avatar</text><text class="xs" x="945" y="213" text-anchor="middle">Meta，无论文</text>
+ <path class="arr" d="M105 80 V108" marker-end="url(#ah)"/>
+ <path class="arr" d="M190 130 H228" marker-end="url(#ah)"/>
+ <path class="arr" d="M190 200 H228" marker-end="url(#ah)"/>
+ <path class="arr" d="M315 180 V152" marker-end="url(#ah)"/>
+ <path class="arr" d="M315 80 V108" marker-end="url(#ah)"/>
+ <path class="arr g" d="M400 130 H438" marker-end="url(#ah-g)"/>
+ <path class="arr g" d="M525 150 V178" marker-end="url(#ah-g)"/>
+ <path class="arr" d="M525 250 V222" marker-end="url(#ah)"/>
+ <path class="arr v" d="M610 200 H648" marker-end="url(#ah-v)"/>
+ <path class="arr v" d="M735 220 V248" marker-end="url(#ah-v)"/>
+ <path class="arr a" d="M820 200 H858" marker-end="url(#ah-a)"/>
+ <text class="xs" x="20" y="260">绿色：少步蒸馏（图像）</text><text class="xs" x="20" y="276">紫色：流式 / 自回归视频</text>
+</svg>
+<figcaption><b>图 1　从 CFG 和 score distillation 到流式视频生成的技术谱系。</b> 方框下是 arXiv 编号。Muse 博客点名的是 DMD 和 Self-Forcing 两个节点，其余是理解它们需要的上下游。</figcaption>
+</figure>
+
+<h2 id="why">1. 背景：扩散模型为什么慢，少步蒸馏有几条路</h2>
+<p>扩散模型生成一张图（或一段视频）要从纯噪声出发，迭代去噪几十步，每步都是一次完整的网络前向。再加上 CFG，每步要跑 2 次（有条件、无条件）甚至 3 次。Muse 的 teacher 就是 40 步 × 3 路 CFG = 每块 120 次前向，离实时差两个数量级。</p>
+<p>「少步蒸馏」就是训练一个 student，用 1–4 步达到 teacher 几十步的效果。主要有四条路线：</p>
+<table>
+<tr><th>路线</th><th>代表工作</th><th>思路</th><th>特点</th></tr>
+<tr><td>轨迹蒸馏</td><td>Progressive Distillation <a href="https://arxiv.org/abs/2202.00512">2202.00512</a></td><td>student 一步模仿 teacher 两步，反复减半</td><td>稳定，但步数很少时画面糊</td></tr>
+<tr><td>一致性模型</td><td>Consistency Models <a href="https://arxiv.org/abs/2303.01469">2303.01469</a>、LCM</td><td>同一条 ODE 轨迹上任意点都映射到同一个终点</td><td>可以 1 步，质量一般</td></tr>
+<tr><td>对抗蒸馏</td><td>ADD / SDXL-Turbo <a href="https://arxiv.org/abs/2311.17042">2311.17042</a></td><td>加 GAN 判别器逼近真实分布</td><td>清晰，但训练不稳</td></tr>
+<tr><td><b>分布匹配</b></td><td><b>DMD / DMD2</b></td><td>不管轨迹，只要求 student 生成的<b>分布</b>和 teacher 一致</td><td>1–4 步质量高，可同时蒸掉 CFG，<b>Muse 用的就是这条</b></td></tr>
+</table>
+
+<h2 id="cfg">2. CFG 与 CFG 蒸馏</h2>
+<h3>2.1 Classifier-Free Guidance</h3>
+<p>论文：Ho &amp; Salimans, <a href="https://arxiv.org/abs/2207.12598">Classifier-Free Diffusion Guidance</a>（2022）。训练时随机把条件 \(c\) 丢掉（比如 10% 概率换成空条件 \(\varnothing\)），一个网络同时学会有条件和无条件预测。推理时外推：</p>
+$$\hat\epsilon=\epsilon(x_t,\varnothing)+w\,\big[\epsilon(x_t,c)-\epsilon(x_t,\varnothing)\big]$$
+<p>\(w&gt;1\) 时样本更贴合条件、更清晰，代价是多样性下降、颜色过饱和，并且每步计算翻倍。</p>
+<h3>2.2 多条件 CFG（Muse 的「三路 CFG」）</h3>
+<p>有多个条件时可以分别控制强度。以音频驱动数字人为例，条件是参考图 \(r\) 和音频 \(a\)：</p>
+$$\hat v=v(\varnothing,\varnothing)+s_r\big[v(r,\varnothing)-v(\varnothing,\varnothing)\big]+s_a\big[v(r,a)-v(r,\varnothing)\big]$$
+<p>三项各一次前向，就是 Muse 博客说的「three-way CFG」。\(s_r\) 管身份像不像，\(s_a\) 管口型和表情跟不跟音频。InstructPix2Pix、OmniHuman、Hallo3 都用过类似形式。</p>
+<h3>2.3 把 CFG 蒸馏掉</h3>
+<ul>
+<li><b>Guidance Distillation</b>（Meng et al., <a href="https://arxiv.org/abs/2210.03142">On Distillation of Guided Diffusion Models</a>, CVPR 2023）：先训练 student 一次前向直接输出 CFG 后的结果（可把 \(w\) 当作输入），再做步数蒸馏。</li>
+<li><b>DMD 的做法更简单</b>：CFG 只用在 teacher（real score）那一侧，student 匹配的是「带 guidance 的分布」，训练完推理时天然不需要 CFG。这正是 Muse 说的「two unguided evaluations」。</li>
+</ul>
+
+<h2 id="dmd">3. DMD 详解（重点）</h2>
+<p>论文：Tianwei Yin 等（MIT + Adobe），<a href="https://arxiv.org/abs/2311.18828">One-step Diffusion with Distribution Matching Distillation</a>，CVPR 2024。<a href="https://tianweiy.github.io/dmd/">项目页</a>。</p>
+
+<h3>3.1 核心思想</h3>
+<p>传统蒸馏让 student 逐点模仿 teacher：同一个噪声输入，输出要和 teacher 跑完 ODE 的结果一样。这要求 student 一步学会一条复杂轨迹，很难。</p>
+<p>DMD 换了一个目标：<b>不要求每个样本和 teacher 一样，只要求 student 生成的所有样本，整体分布和 teacher 的分布一样</b>。衡量两个分布差距用 KL 散度，而 KL 散度对 student 参数的梯度，恰好可以用两个扩散模型（score 函数）的差来算。</p>
+
+<h3>3.2 公式</h3>
+<p>记 student 生成器 \(G_\theta\)，输入噪声 \(z\) 输出样本 \(x=G_\theta(z)\)。直接比较 \(p_{\text{fake}}\)（student 分布）和 \(p_{\text{real}}\)（teacher 分布）不可行，DMD 在<b>加噪之后</b>的分布上比较（加噪让两个分布有重叠，梯度不会消失）：</p>
+$$x_t=\alpha_t\,x+\sigma_t\,\epsilon,\qquad \mathcal L=\mathbb E_t\big[D_{\mathrm{KL}}\big(p_{\text{fake},t}\,\|\,p_{\text{real},t}\big)\big]$$
+<p>对 \(\theta\) 求导，KL 散度的梯度只依赖两个分布的 score 之差：</p>
+$$\nabla_\theta\mathcal L=\mathbb E_{z,t,\epsilon}\Big[w_t\,\big(s_{\text{fake}}(x_t,t)-s_{\text{real}}(x_t,t)\big)\,\frac{\partial x_t}{\partial\theta}\Big]$$
+<p>而扩散模型本身就是 score 估计器。若去噪网络 \(\mu(x_t,t)\) 预测干净样本，则 \(s(x_t)=-\big(x_t-\alpha_t\,\mu(x_t,t)\big)/\sigma_t^2\)，所以：</p>
+$$s_{\text{fake}}-s_{\text{real}}=\frac{\alpha_t}{\sigma_t^2}\big(\mu_{\text{fake}}(x_t,t)-\mu_{\text{real}}(x_t,t)\big)$$
+<p><b>直观理解</b>：把 student 的样本加噪，分别让 teacher 和「fake 模型」去噪。teacher 认为它应该长成 \(\mu_{\text{real}}\)，fake 模型认为 student 平时生成的样子是 \(\mu_{\text{fake}}\)。两者的差就是「student 样本应该往哪边改」的方向。</p>
+
+<h3>3.3 两个 score 网络</h3>
+<ul>
+<li><b>Real score</b>：冻结的预训练 teacher。用它时可以加 CFG，这样 student 学到的就是带 guidance 的分布。</li>
+<li><b>Fake score</b>：从 teacher 初始化，<b>在线训练</b>，用普通去噪损失拟合 student 当前生成的样本：\(\;\min_\phi\ \mathbb E\,\|\mu_{\text{fake},\phi}(x_t,t)-\mathrm{sg}(x)\|^2\)（sg 是 stop-gradient）。student 在变，fake score 要一直跟着更新。</li>
+</ul>
+<p>所以训练时同时有三个网络：student、real、fake，显存开销是 DMD 的主要代价之一。</p>
+
+<figure>
+<svg viewBox="0 0 1040 340" role="img" aria-label="DMD 训练示意">
+ <rect class="io" x="20" y="120" width="90" height="50" rx="8"/><text class="lbl" x="65" y="150" text-anchor="middle">噪声 z</text>
+ <rect class="green" x="140" y="110" width="150" height="70" rx="8" style="stroke-width:2.2"/><text class="lbl" x="215" y="138" text-anchor="middle">Student G_θ</text><text class="xs" x="215" y="158" text-anchor="middle">1–4 步生成</text>
+ <rect class="blue" x="320" y="120" width="110" height="50" rx="8"/><text class="lbl" x="375" y="150" text-anchor="middle">样本 x</text>
+ <rect class="box" x="460" y="115" width="130" height="60" rx="8"/><text class="lbl" x="525" y="140" text-anchor="middle">随机加噪到 t</text><text class="xs" x="525" y="160" text-anchor="middle">x_t = α_t x + σ_t ε</text>
+ <rect class="blue" x="630" y="40" width="200" height="60" rx="8"/><text class="lbl" x="730" y="65" text-anchor="middle">Real score μ_real</text><text class="xs" x="730" y="85" text-anchor="middle">冻结 teacher（含 CFG）</text>
+ <rect class="warm" x="630" y="190" width="200" height="60" rx="8"/><text class="lbl" x="730" y="215" text-anchor="middle">Fake score μ_fake</text><text class="xs" x="730" y="235" text-anchor="middle">在线训练，追踪 student 分布</text>
+ <rect class="violet" x="860" y="110" width="165" height="70" rx="8"/><text class="lbl" x="942" y="138" text-anchor="middle">μ_fake − μ_real</text><text class="xs" x="942" y="158" text-anchor="middle">= 梯度方向</text>
+ <path class="arr" d="M110 145 H138" marker-end="url(#ah)"/>
+ <path class="arr" d="M290 145 H318" marker-end="url(#ah)"/>
+ <path class="arr" d="M430 145 H458" marker-end="url(#ah)"/>
+ <path class="arr a" d="M590 135 H610 V70 H628" marker-end="url(#ah-a)"/>
+ <path class="arr w" d="M590 155 H610 V220 H628" marker-end="url(#ah-w)"/>
+ <path class="arr a" d="M830 70 H900 V108" marker-end="url(#ah-a)"/>
+ <path class="arr w" d="M830 220 H900 V182" marker-end="url(#ah-w)"/>
+ <path class="arr g dash" d="M942 180 V300 H215 V182" marker-end="url(#ah-g)"/>
+ <text class="sm" x="580" y="318" text-anchor="middle" style="fill:var(--green)">只更新 student（梯度经 x_t 回传到 G_θ）</text>
+ <path class="arr w dash" d="M375 170 V270 H730 V252" marker-end="url(#ah-w)"/>
+ <text class="xs" x="520" y="264" text-anchor="middle">用 student 样本做去噪训练</text>
+</svg>
+<figcaption><b>图 2　DMD 训练示意。</b> student 生成样本并加噪，冻结的 teacher 和在线训练的 fake 模型分别去噪，两者之差作为 student 的梯度。fake 模型另外用 student 的样本做普通去噪训练，始终跟踪 student 当前的分布。</figcaption>
+</figure>
+
+<h3>3.4 伪代码</h3>
+<pre><code class="language-python">for step in range(N):
+    z = randn(B, C, H, W)
+    x = G(z)                                  # student 生成（1 步或几步）
+    t = rand_t(); eps = randn_like(x)
+    x_t = alpha[t] * x + sigma[t] * eps
+
+    with no_grad():
+        mu_real = teacher_cfg(x_t, t, cond)   # 冻结 teacher，带 CFG
+        mu_fake = fake(x_t, t, cond)          # 当前 fake score
+        w = 1.0 / (x - mu_real).abs().mean()  # DMD 的归一化权重
+        grad = w * (mu_fake - mu_real)
+
+    # 用「伪目标」把 grad 注入 x：对 x 求导正好得到 grad
+    loss_G = 0.5 * ((x - (x - grad).detach()) ** 2).sum()
+    loss_G.backward(); opt_G.step()
+
+    # 更新 fake score：普通去噪损失，样本来自 student
+    for _ in range(k):                        # DMD2 里 k = 5
+        x_t = alpha[t] * x.detach() + sigma[t] * eps
+        loss_F = ((fake(x_t, t, cond) - x.detach()) ** 2).mean()
+        loss_F.backward(); opt_F.step()
+</code></pre>
+
+<h3>3.5 DMD 的问题与 DMD2 的改进</h3>
+<p>只用分布匹配损失时，student 容易<b>模式坍缩</b>（反向 KL 天然偏向「只覆盖一部分模式」）。DMD1 的办法是额外加一个<b>回归损失</b>：先用 teacher 跑 ODE 生成大量「噪声 → 图像」配对，要求 student 在这些配对上输出接近（LPIPS）。这需要离线生成大量数据，成本很高，而且把 student 的上限锁在 teacher 上。</p>
+<p>DMD2（Yin et al., <a href="https://arxiv.org/abs/2405.14867">Improved Distribution Matching Distillation for Fast Image Synthesis</a>, NeurIPS 2024 oral，<a href="https://tianweiy.github.io/dmd2/">项目页</a>，<a href="https://github.com/tianweiy/DMD2">代码</a>）做了四个改进：</p>
+<ol>
+<li><b>去掉回归损失</b>，不再需要离线配对数据。</li>
+<li><b>双时间尺度更新（TTUR）</b>：fake score 更新 5 次，student 更新 1 次，让 fake score 始终准确跟上 student，这是去掉回归损失后还能稳定训练的关键。</li>
+<li><b>加 GAN 损失</b>：在 fake score 网络的中间特征上接一个判别头，用<b>真实图片</b>和 student 样本训练。这样 student 能直接从真实数据学习，有机会<b>超过 teacher</b>。</li>
+<li><b>多步生成器 + backward simulation</b>：student 可以是 2–4 步，训练时先用 student 自己跑出中间步的输入，消除训练和推理的不一致。这个思路和后面的 Self-Forcing 一脉相承。</li>
+</ol>
+
+<h3>3.6 为什么 student 能比 teacher 好</h3>
+<p>Muse 博客里 2 步 student 对 40 步 teacher 的人类偏好是 55% : 45%，DMD2 论文在图像上也观察到 student 超过 teacher。原因大致有三个：</p>
+<ul>
+<li>teacher 靠高 CFG 才清晰，但高 CFG 会过饱和、动作僵硬；DMD 匹配的是分布，不会把 CFG 的副作用逐点复制过来。</li>
+<li>反向 KL 偏向「挑最好的模式」，牺牲一些多样性换来每个样本更干净。对数字人来说，多样性不重要，稳定好看更重要。</li>
+<li>加了 GAN 损失后，student 可以从真实数据学到 teacher 没学好的细节。</li>
+</ul>
+
+<h3>3.7 同一家族的相关方法</h3>
+<table>
+<tr><th>方法</th><th>论文</th><th>和 DMD 的关系</th></tr>
+<tr><td>SDS</td><td>DreamFusion <a href="https://arxiv.org/abs/2209.14988">2209.14988</a></td><td>用 2D 扩散模型的 score 优化 3D 表示；只有 real score，相当于「fake score = 加的噪声」，结果偏糊、过饱和</td></tr>
+<tr><td>VSD</td><td>ProlificDreamer <a href="https://arxiv.org/abs/2305.16213">2305.16213</a></td><td>引入一个在线训练的 LoRA 作为 fake score，与 DMD 的两个 score 结构相同</td></tr>
+<tr><td>Diff-Instruct</td><td><a href="https://arxiv.org/abs/2305.18455">2305.18455</a></td><td>同期提出用积分 KL 蒸馏一步生成器，理论上与 DMD 几乎等价</td></tr>
+<tr><td>SiD</td><td>Score identity Distillation <a href="https://arxiv.org/abs/2404.04057">2404.04057</a></td><td>换用 Fisher 散度做分布匹配，无需真实数据；Self-Forcing 论文也测试过 SiD 目标</td></tr>
+</table>
+
+<h2 id="video">4. 从图像到流式视频：CausVid 与 Self-Forcing</h2>
+<h3>4.1 问题：双向模型无法流式</h3>
+<p>主流视频扩散模型（Movie Gen、Wan 等）是<b>双向</b>的：一次生成整段视频，每一帧都能看到所有其他帧，包括未来。这样质量好，但必须等整段生成完才能播，第一帧延迟是几十秒到几分钟。流式生成需要<b>因果</b>模型：只看过去，一块一块往下生成，可以用 KV cache 复用历史，就像 LLM 逐 token 生成。</p>
+
+<h3>4.2 Diffusion Forcing</h3>
+<p>Chen et al., <a href="https://arxiv.org/abs/2407.01392">Diffusion Forcing: Next-token Prediction Meets Full-Sequence Diffusion</a>（NeurIPS 2024）。给序列里每一帧独立的噪声水平，训练一个因果模型。这让「历史帧干净、当前帧带噪」的自回归生成成为可能，是因果视频扩散的基础。</p>
+
+<h3>4.3 CausVid：双向 teacher → 因果 student</h3>
+<p>Yin et al.（MIT + Adobe，DMD 原班人马），<a href="https://arxiv.org/abs/2412.07772">From Slow Bidirectional to Fast Autoregressive Video Diffusion Models</a>，CVPR 2025，<a href="https://causvid.github.io/">项目页</a>，<a href="https://github.com/tianweiy/CausVid">代码</a>。</p>
+<ul>
+<li><b>非对称蒸馏</b>：teacher 是双向多步模型（质量好），student 是块因果的少步模型（速度快），用 DMD 把前者的分布蒸到后者。teacher 能看到未来，student 不能，但 student 学的是「整体分布」，所以能间接继承 teacher 对未来的把握。</li>
+<li><b>ODE 初始化</b>：先用 teacher 生成一批 ODE 轨迹，让因果 student 回归这些轨迹作为热启动，再进入 DMD。</li>
+<li>推理时用 KV cache，首帧延迟降到秒级以内，在单卡上实现流式视频生成。</li>
+</ul>
+<p>Muse 的「双向 teacher → 因果 student」和 CausVid 的框架一致。</p>
+
+<h3>4.4 Self-Forcing：训练时就像推理一样</h3>
+<p>Huang et al., <a href="https://arxiv.org/abs/2506.08009">Self Forcing: Bridging the Train-Test Gap in Autoregressive Video Diffusion</a>（2025），<a href="https://self-forcing.github.io/">项目页</a>，<a href="https://github.com/guandeh17/Self-Forcing">代码</a>。</p>
+<p><b>问题：exposure bias。</b> 自回归模型训练时，上下文是真实视频（teacher forcing），或加了噪声的真实视频（diffusion forcing）；推理时上下文却是自己之前生成的、带着误差的帧。训练从没见过自己的误差，推理时误差一块块累积，视频越往后越崩（颜色漂移、身份变化、画面糊）。这个问题在 NLP 里早就有，对应的经典工作是 Scheduled Sampling（<a href="https://arxiv.org/abs/1506.03099">1506.03099</a>）。</p>
+
+<figure>
+<svg viewBox="0 0 1040 290" role="img" aria-label="Teacher Forcing、Diffusion Forcing 与 Self Forcing 对比">
+ <g>
+  <text class="lbl" x="10" y="60">Teacher Forcing</text><text class="xs" x="10" y="78">上下文 = 真实帧</text>
+  <rect class="io" x="200" y="40" width="60" height="44" rx="6"/><text class="xs" x="230" y="66" text-anchor="middle">真实 1</text>
+  <rect class="io" x="270" y="40" width="60" height="44" rx="6"/><text class="xs" x="300" y="66" text-anchor="middle">真实 2</text>
+  <rect class="io" x="340" y="40" width="60" height="44" rx="6"/><text class="xs" x="370" y="66" text-anchor="middle">真实 3</text>
+  <rect class="blue" x="420" y="40" width="60" height="44" rx="6" style="stroke-width:2.2"/><text class="xs" x="450" y="66" text-anchor="middle">生成 4</text>
+  <text class="sm" x="510" y="58">训练时看真实历史，推理时看自己的历史</text><text class="sm" x="510" y="76">→ 训练和推理分布不一致，误差累积</text>
+ </g>
+ <g>
+  <text class="lbl" x="10" y="150">Diffusion Forcing</text><text class="xs" x="10" y="168">上下文 = 加噪真实帧</text>
+  <rect class="io dash" x="200" y="130" width="60" height="44" rx="6"/><text class="xs" x="230" y="156" text-anchor="middle">真实+噪</text>
+  <rect class="io dash" x="270" y="130" width="60" height="44" rx="6"/><text class="xs" x="300" y="156" text-anchor="middle">真实+噪</text>
+  <rect class="io dash" x="340" y="130" width="60" height="44" rx="6"/><text class="xs" x="370" y="156" text-anchor="middle">真实+噪</text>
+  <rect class="blue" x="420" y="130" width="60" height="44" rx="6" style="stroke-width:2.2"/><text class="xs" x="450" y="156" text-anchor="middle">生成 4</text>
+  <text class="sm" x="510" y="148">噪声模拟「不完美的历史」，有所缓解</text><text class="sm" x="510" y="166">→ 但噪声 ≠ 模型自己的误差</text>
+ </g>
+ <g>
+  <text class="lbl" x="10" y="240">Self Forcing</text><text class="xs" x="10" y="258">上下文 = 自己生成的帧</text>
+  <rect class="violet" x="200" y="220" width="60" height="44" rx="6"/><text class="xs" x="230" y="246" text-anchor="middle">自生成 1</text>
+  <rect class="violet" x="270" y="220" width="60" height="44" rx="6"/><text class="xs" x="300" y="246" text-anchor="middle">自生成 2</text>
+  <rect class="violet" x="340" y="220" width="60" height="44" rx="6"/><text class="xs" x="370" y="246" text-anchor="middle">自生成 3</text>
+  <rect class="blue" x="420" y="220" width="60" height="44" rx="6" style="stroke-width:2.2"/><text class="xs" x="450" y="246" text-anchor="middle">生成 4</text>
+  <path class="arr v" d="M402 242 H418" marker-end="url(#ah-v)"/>
+  <text class="sm" x="510" y="238">训练时真的按推理方式逐块 rollout（带 KV cache）</text><text class="sm" x="510" y="256">→ 在整段生成视频上算 DMD / GAN 损失，训练 = 推理</text>
+ </g>
+</svg>
+<figcaption><b>图 3　三种自回归训练方式。</b> 都是在给定前 3 块的条件下生成第 4 块，区别在于训练时前 3 块从哪里来。Self Forcing 让模型在训练中就面对自己的误差，并学会纠正。</figcaption>
+</figure>
+
+<p><b>做法</b>：</p>
+<ul>
+<li>训练时 student <b>真的逐块生成</b>整段视频：第 1 块从噪声生成，然后作为第 2 块的上下文放进 KV cache，依次类推，和推理完全一样。</li>
+<li>生成完整段后，在<b>整段视频</b>上算分布匹配损失（DMD、SiD 或 GAN 都可以），而不是逐帧和真实视频比。这样的损失天然是「视频级」的，能惩罚长程不一致。</li>
+<li><b>省显存的技巧</b>：每块的少步去噪里随机选一步作为最后一步，只在这一步保留梯度，其余步 no_grad；历史块的梯度也截断。这样整段 rollout 的训练成本是可承受的。</li>
+<li><b>滚动 KV cache</b>：只保留最近若干块的 KV，可以生成比训练时更长的视频。</li>
+</ul>
+<p>Muse 博客说 student 是「通过 self-forcing 和 distribution matching distillation」训练出来的，就是这一节加上第 3 节。</p>
+
+<h3>4.5 后续：Self-Forcing++ 与更长视频</h3>
+<p>Self-Forcing 训练时只 rollout 几秒，生成更长视频还是会退化。<a href="https://arxiv.org/abs/2510.02283">Self-Forcing++</a>（ICLR 2026，<a href="https://self-forcing-plus-plus.github.io">项目页</a>）让 student 先自己生成远超 teacher 长度的视频，再从中截取片段让 teacher 纠正，把稳定生成长度推到分钟级。数字人对话可能持续几十分钟，Muse 的「参考锚点 + 滚动窗口 + memory-aware 位置编码」也是在解决同一个问题。此外还有大量针对数字人的变体，比如 <a href="https://arxiv.org/abs/2603.14331">AvatarForcing</a>、<a href="https://arxiv.org/abs/2512.23576">LiveTalk</a>，在 <a href="/deep-learning/muse-realtime-avatar/#rt-deep">Muse 解析的第 8 节</a>有对比。</p>
+
+<h2 id="infer">5. 推理加速：4-bit 量化、CUDA Graph 与融合 kernel</h2>
+<h3>5.1 4-bit 量化感知训练（QAT）</h3>
+<ul>
+<li><b>PTQ vs QAT</b>：训练后量化（PTQ）直接把权重压到低精度，4-bit 时扩散模型通常明显掉画质。量化感知训练（QAT）在训练时就插入「假量化」：前向按 4-bit 舍入，反向用直通估计（STE）让梯度绕过舍入，模型学会适应量化误差。</li>
+<li><b>NVFP4</b>：Blackwell（B200 / GB200）原生支持的 4-bit 浮点格式，每 16 个数共享一个 FP8 缩放因子，再加一个张量级缩放，比整数 INT4 更能容忍离群值。NVIDIA 的介绍：<a href="https://developer.nvidia.com/blog/nvfp4-trains-with-precision-of-16-bit-and-speed-and-efficiency-of-4-bit">NVFP4 训练</a>、<a href="https://research.nvidia.com/labs/eai/blogs/pushing-intelligence-to-4-bit/">Pushing Intelligence to 4-bit</a>、<a href="https://developer.nvidia.com/blog/scaling-nvfp4-inference-for-flux-2-on-nvidia-blackwell-data-center-gpus/">FLUX.2 的 NVFP4 推理</a>。</li>
+<li><b>扩散模型量化的论文</b>：Q-Diffusion（<a href="https://arxiv.org/abs/2302.04304">2302.04304</a>，PTQ 的经典工作）、SVDQuant（<a href="https://arxiv.org/abs/2411.05007">2411.05007</a>，用低秩分支吸收离群值实现 4-bit 扩散模型）、Attn-QAT（<a href="https://arxiv.org/abs/2603.00040">2603.00040</a>，4-bit attention 的 QAT）。</li>
+<li>Muse 博客说相对「2 步 BF16 基线」吞吐提升 8 倍，4-bit 应是其中最大的一块（权重和激活的显存带宽、tensor core 算力都约为 BF16 的 4 倍）。</li>
+</ul>
+<h3>5.2 CUDA Graph 与融合 kernel</h3>
+<ul>
+<li><b>问题</b>：少步、小 batch 的推理里，一次前向由几千个小 kernel 组成，CPU 逐个下发 kernel 的开销（每个几微秒）会占到总时间的大头，GPU 反而在等。</li>
+<li><b>CUDA Graph</b>：把整段前向「录制」成一张图，之后一次性提交，消除逐个 launch 的开销。要求输入形状固定，这正好和「每块固定 8 帧、固定长度 KV cache」的设计吻合。入门：NVIDIA <a href="https://developer.nvidia.com/blog/cuda-graphs/">Getting Started with CUDA Graphs</a>；PyTorch 里 <code>torch.compile(mode="reduce-overhead")</code> 会自动使用。</li>
+<li><b>融合 kernel</b>：把 LayerNorm、adaLN 调制、激活、量化/反量化等逐元素操作合并成一个 kernel，减少显存读写。注意力部分用 FlashAttention（<a href="https://arxiv.org/abs/2205.14135">2205.14135</a>）这类融合实现。</li>
+</ul>
+
+<h2 id="dit">6. Diffusion Transformer 简介</h2>
+<ul>
+<li><b>DiT</b>：Peebles &amp; Xie, <a href="https://arxiv.org/abs/2212.09748">Scalable Diffusion Models with Transformers</a>（ICCV 2023）。把 latent 切成 patch 当 token，用标准 Transformer 替代 U-Net；条件（时间步、类别）通过 <b>adaLN-Zero</b> 调制每层的 LayerNorm。主要结论是模型越大、算力越多，FID 稳定下降，扩展性好。</li>
+<li><b>视频 DiT</b>：Meta Movie Gen（<a href="https://arxiv.org/abs/2410.13720">2410.13720</a>）、阿里 Wan（<a href="https://arxiv.org/abs/2503.20314">2503.20314</a>）都是「时空 VAE + DiT + flow matching」的结构，Muse 大概率也是。</li>
+<li><b>Flow matching</b>：Lipman et al.（<a href="https://arxiv.org/abs/2210.02747">2210.02747</a>）、Rectified Flow（<a href="https://arxiv.org/abs/2209.03003">2209.03003</a>）。现在的视频模型大多用它替代 DDPM 的噪声预测。</li>
+<li>本博客的 <a href="/deep-learning/transformer-study/">Transformer 学习</a> 和 <a href="/deep-learning/diffusion-study/">Diffusion Models 学习</a> 可以作为前置。</li>
+</ul>
+
+<h2 id="path">7. 建议的学习顺序</h2>
+<ol>
+<li><b>CFG</b>（半天）：读 2207.12598，理解条件丢弃和外推公式。</li>
+<li><b>SDS → VSD</b>（1 天）：DreamFusion 第 3 节和 ProlificDreamer 的 VSD 部分。理解「用 score 差做梯度」这个核心技巧，DMD 的公式就很自然了。</li>
+<li><b>DMD → DMD2</b>（2–3 天）：先读 DMD 的方法部分，再读 DMD2 的四个改进；对照 <a href="https://github.com/tianweiy/DMD2">DMD2 代码</a> 看 fake score 的更新和 GAN 头。</li>
+<li><b>Diffusion Forcing → CausVid</b>（1–2 天）：理解因果视频扩散和非对称蒸馏。</li>
+<li><b>Self-Forcing</b>（2 天）：读论文和 <a href="https://github.com/guandeh17/Self-Forcing">代码</a>，代码基于 Wan 1.3B，单卡可以跑推理，是动手实验的最好起点。</li>
+<li><b>推理优化</b>（按需）：CUDA Graph 入门博客，NVFP4 介绍，SVDQuant。</li>
+</ol>
+
+<h2>论文与资源清单</h2>
+<table>
+<tr><th>主题</th><th>论文</th><th>代码 / 项目页</th></tr>
+<tr><td>CFG</td><td><a href="https://arxiv.org/abs/2207.12598">Classifier-Free Diffusion Guidance</a></td><td>—</td></tr>
+<tr><td>CFG 蒸馏</td><td><a href="https://arxiv.org/abs/2210.03142">On Distillation of Guided Diffusion Models</a></td><td>—</td></tr>
+<tr><td>SDS</td><td><a href="https://arxiv.org/abs/2209.14988">DreamFusion</a></td><td><a href="https://dreamfusion3d.github.io/">项目页</a></td></tr>
+<tr><td>VSD</td><td><a href="https://arxiv.org/abs/2305.16213">ProlificDreamer</a></td><td>—</td></tr>
+<tr><td>Diff-Instruct</td><td><a href="https://arxiv.org/abs/2305.18455">Diff-Instruct</a></td><td>—</td></tr>
+<tr><td><b>DMD</b></td><td><a href="https://arxiv.org/abs/2311.18828">One-step Diffusion with Distribution Matching Distillation</a></td><td><a href="https://tianweiy.github.io/dmd/">项目页</a></td></tr>
+<tr><td><b>DMD2</b></td><td><a href="https://arxiv.org/abs/2405.14867">Improved Distribution Matching Distillation</a></td><td><a href="https://github.com/tianweiy/DMD2">代码</a> · <a href="https://tianweiy.github.io/dmd2/">项目页</a></td></tr>
+<tr><td>SiD</td><td><a href="https://arxiv.org/abs/2404.04057">Score identity Distillation</a></td><td>—</td></tr>
+<tr><td>Diffusion Forcing</td><td><a href="https://arxiv.org/abs/2407.01392">Diffusion Forcing</a></td><td>—</td></tr>
+<tr><td><b>CausVid</b></td><td><a href="https://arxiv.org/abs/2412.07772">From Slow Bidirectional to Fast Autoregressive Video Diffusion</a></td><td><a href="https://github.com/tianweiy/CausVid">代码</a> · <a href="https://causvid.github.io/">项目页</a></td></tr>
+<tr><td><b>Self-Forcing</b></td><td><a href="https://arxiv.org/abs/2506.08009">Self Forcing</a></td><td><a href="https://github.com/guandeh17/Self-Forcing">代码</a> · <a href="https://self-forcing.github.io/">项目页</a></td></tr>
+<tr><td>Self-Forcing++</td><td><a href="https://arxiv.org/abs/2510.02283">Self-Forcing++</a></td><td><a href="https://self-forcing-plus-plus.github.io">项目页</a></td></tr>
+<tr><td>DiT</td><td><a href="https://arxiv.org/abs/2212.09748">Scalable Diffusion Models with Transformers</a></td><td>—</td></tr>
+<tr><td>4-bit 扩散</td><td><a href="https://arxiv.org/abs/2411.05007">SVDQuant</a> · <a href="https://arxiv.org/abs/2302.04304">Q-Diffusion</a></td><td><a href="https://developer.nvidia.com/blog/nvfp4-trains-with-precision-of-16-bit-and-speed-and-efficiency-of-4-bit">NVFP4 博客</a></td></tr>
+<tr><td>CUDA Graph</td><td>—</td><td><a href="https://developer.nvidia.com/blog/cuda-graphs/">NVIDIA 入门</a></td></tr>
+</table>
+<p class="meta">论文链接和年份已核对 arXiv 编号；方法细节按论文内容整理，个别实现细节（如伪代码里的权重写法）做了简化。图均为自绘示意。</p>
+</div>

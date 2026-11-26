@@ -59,4 +59,12 @@ description: "Deep learning technical notes and study blog."
     <span class="note-index-keywords">Bayes rule, Gaussian distributions, expected value, variance, KL divergence, BCE, transposed convolution, and trace.</span>
     <span class="note-index-summary">这篇主要整理 deep learning 中反复会用到的数学工具，从贝叶斯公式、期望方差、高斯分布推导，到 KL Divergence、BCE Loss 和转置卷积。它更像后续生成模型笔记的基础索引，遇到公式推导时可以回头查。</span>
   </a>
+  <a class="note-index-card" href="/deep-learning/fast-video-diffusion/">
+    <span class="note-index-card-head">
+      <strong>实时视频扩散的关键技术：DMD、Self-Forcing 与推理加速</strong>
+      <time datetime="2026-11">2026.11</time>
+    </span>
+    <span class="note-index-keywords">CFG distillation, Distribution Matching Distillation (DMD/DMD2), CausVid, Self-Forcing, 4-bit QAT, CUDA Graph, DiT.</span>
+    <span class="note-index-summary">Muse 解析的配套笔记，把实时视频扩散用到的技术逐个展开：从 CFG 讲到 DMD 如何用两个 score 网络之差训练少步生成器，DMD2 的四个改进，CausVid 的双向到因果蒸馏，Self-Forcing 如何消除自回归的训练推理不一致，以及 4-bit 量化和 CUDA Graph。附论文、代码和建议的学习顺序。</span>
+  </a>
 </div>
