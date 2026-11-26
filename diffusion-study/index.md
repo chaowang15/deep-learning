@@ -1,4 +1,9 @@
 ---
+date: 2026-06-01 00:00:00 -0800
+keywords: >-
+  DDPM, forward process, reverse process, ELBO, beta schedule, training loss, and sampling.
+summary: >-
+  这篇笔记整理 Diffusion Models 和 DDPM 的核心流程，从 forward process 如何逐步加噪，到 reverse process 如何学习去噪分布，再展开 ELBO 推导、training loss、beta schedule 与 sampling 过程。内容更偏公式推导和直觉解释结合，适合作为生成模型笔记中 diffusion 部分的专题页。
 layout: note
 title: "Diffusion Models 扩散模型学习"
 description: "Notes on diffusion models, DDPM, forward and reverse processes, ELBO derivation, training loss, and sampling."

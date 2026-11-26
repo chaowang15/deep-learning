@@ -1,4 +1,9 @@
 ---
+date: 2025-01-01 00:00:00 -0800
+keywords: >-
+  Bayes rule, Gaussian distributions, expected value, variance, KL divergence, BCE, transposed convolution, and trace.
+summary: >-
+  这篇主要整理 deep learning 中反复会用到的数学工具，从贝叶斯公式、期望方差、高斯分布推导，到 KL Divergence、BCE Loss 和转置卷积。它更像后续生成模型笔记的基础索引，遇到公式推导时可以回头查。
 layout: note
 title: "深度学习中的数学基础"
 description: "深度学习和生成模型相关的数学基础笔记。"
