@@ -4,10 +4,13 @@ import torch
 
 
 def make_beta_schedule(T, beta_start=1e-4, beta_end=0.02, device="cpu"):
+    # Index convention: code index i = 0..T-1 is paper timestep t = i + 1.
+    # x0 (clean image) is paper t = 0 and has no entry in these tables.
+    #
     # beta = 1e-4 .. 0.02
     # alpha = 1 - beta
-    # alpha_bar_i = alpha_0 * alpha_1 * ... * alpha_{i-1}
-    # sqrt_alpha_bar_i = sqrt(alpha_bar_i)
+    # alpha_bars[i] = alphas[0] * alphas[1] * ... * alphas[i]   (cumprod includes i)
+    # sqrt_alpha_bars[i] = sqrt(alpha_bars[i])
     #
     # q_sample: x_t = sqrt_alpha_bars[t] * x0 + sqrt_one_minus_alpha_bars[t] * noise
 
