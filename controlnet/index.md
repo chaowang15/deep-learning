@@ -31,9 +31,15 @@ description: "How ControlNet adds edge, depth and pose control to a frozen diffu
 2. 把这个 U-Net 的**前半段（编码器和中间层）复制一份**，这份拷贝是可训练的，额外接收条件图；
 3. 拷贝在每个分辨率上的输出经过**零初始化的卷积**，作为残差加回冻结 U-Net 的 skip 连接和中间层。
 
-因为第 3 步的卷积初始全为 0，刚开始训练时整个模型和原模型**完全一样**；训练只是在这个起点上，逐渐学会"按条件图修改各层特征"。下面先讲清这三点为什么这样设计，再用一个能跑的小模型真的训练一遍，最后给出 SD 1.5 上逐层精确的结构和实际用法。
+因为第 3 步的卷积初始全为 0，刚开始训练时整个模型和原模型**完全一样**；训练只是在这个起点上，逐渐学会"按条件图修改各层特征"。下文先说明这三点的设计原因，再在一个小模型上完整训练一遍，最后给出 SD 1.5 上逐层精确的结构和实际用法。
 
-本文主要参考 ControlNet 原论文 [[1]](#ref-1) 和官方仓库 [[2]](#ref-2)。正文里用 [n] 标出具体出处，完整列表见文末「参考资料」。
+## 参考资料
+
+本文主要参考 ControlNet 原论文 [1] 和官方仓库 [2]。正文中用 [n] 标注具体出处。
+
+- <a id="ref-1"></a>**[1] 主论文**：Zhang, Rao, Agrawala. *Adding Conditional Control to Text-to-Image Diffusion Models*. ICCV 2023. [arxiv.org/abs/2302.05543](https://arxiv.org/abs/2302.05543)。可训练拷贝、零卷积、突然收敛、guess mode 都来自这篇。
+- <a id="ref-2"></a>**[2] 官方仓库**：lllyasviel/ControlNet [github.com/lllyasviel/ControlNet](https://github.com/lllyasviel/ControlNet)。各种条件图的预处理器和 SD 1.5 的 ControlNet 权重。
+- <a id="ref-3"></a>**[3] Diffusers 训练文档**：Hugging Face Diffusers: ControlNet training [huggingface.co/docs/diffusers/en/training/controlnet](https://huggingface.co/docs/diffusers/en/training/controlnet)。第 7 节训练和推理代码对应的官方脚本说明。
 
 ## 0. 全文路线
 
@@ -42,7 +48,7 @@ description: "How ControlNet adds edge, depth and pose control to a frozen diffu
 | 1 | ControlNet 要解决什么问题，为什么不直接微调或拼接输入 |
 | 2 | 结构和公式：冻结主干 + 可训练拷贝 + 零卷积；零卷积为什么能学 |
 | 3 | 最小实现：在 [DDPM 篇](/deep-learning/ddpm-from-scratch/)的 Tiny U-Net 上加 ControlNet（含两张手绘结构图） |
-| 4 | 实验：在 FashionMNIST 上用边缘图真的训练一个，观察"突然收敛"、零初始化的作用、控制强度 |
+| 4 | 实验：在 FashionMNIST 上用边缘图训练一个 ControlNet，观察"突然收敛"、零初始化的作用、控制强度 |
 | 5 | SD 1.5 上的精确 ControlNet：条件编码器、12 + 1 个零卷积、参数量 |
 | 6 | 推理：control scale、CFG、guess mode、多个 ControlNet、分时段控制 |
 | 7 | 用 Diffusers 训练和推理 |
@@ -197,7 +203,7 @@ $$
 
 ### 2.4 全零的权重为什么还能学
 
-直觉上会担心：权重全是 0，梯度会不会也是 0，永远学不动？看一个 1×1 卷积（就是逐位置的线性层）$$y = W x + b$$，链式法则给出
+一个自然的疑问是：权重全为 0 时，梯度是否也为 0，导致参数无法更新？看一个 1×1 卷积（就是逐位置的线性层）$$y = W x + b$$，链式法则给出
 
 $$
 \frac{\partial \mathcal{L}}{\partial W} = \frac{\partial \mathcal{L}}{\partial y}\, x^\top,\qquad
@@ -823,9 +829,3 @@ def segmentation_condition(labels, num_classes, size):
 - **SD 1.5 上多大？** 条件编码器把 512×512 的条件图降到 64×64；12 条 skip + 1 个中间层共 13 个残差；约 3.61 亿参数，是 U-Net 的 42%。
 - **control scale 和 CFG 的区别？** 前者缩放控制残差，管条件图的强度；后者组合有、无文本条件的两次预测，管文本的强度。guess mode 只给有条件分支加残差，并按分辨率加权。
 - **常见的坑？** 先冻结再 `deepcopy` 会让拷贝也被冻结；冻结的 U-Net 前向不能放进 `no_grad`；`model.train()` 会把冻结部分也切到训练模式；条件图不进 VAE，范围是 $$[0, 1]$$；残差的数量、通道、分辨率必须和 base 的 skip 一一对应。
-
-## 参考资料
-
-- <a id="ref-1"></a>**[1] 主论文**：Zhang, Rao, Agrawala. *Adding Conditional Control to Text-to-Image Diffusion Models*. ICCV 2023. [arxiv.org/abs/2302.05543](https://arxiv.org/abs/2302.05543)。可训练拷贝、零卷积、突然收敛、guess mode 都来自这篇。
-- <a id="ref-2"></a>**[2] 官方仓库**：lllyasviel/ControlNet [github.com/lllyasviel/ControlNet](https://github.com/lllyasviel/ControlNet)。各种条件图的预处理器和 SD 1.5 的 ControlNet 权重。
-- <a id="ref-3"></a>**[3] Diffusers 训练文档**：Hugging Face Diffusers: ControlNet training [huggingface.co/docs/diffusers/en/training/controlnet](https://huggingface.co/docs/diffusers/en/training/controlnet)。第 7 节训练和推理代码对应的官方脚本说明。

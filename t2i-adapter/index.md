@@ -22,7 +22,7 @@ description: "How T2I-Adapter adds spatial control to a frozen Stable Diffusion 
 
 [ControlNet](/deep-learning/controlnet/) 给 Stable Diffusion 加空间控制的办法是：把 U-Net 的前半段整个复制一份来处理条件图。效果很好，但代价也大：SD 1.5 上 ControlNet 有 3.6 亿参数，而且**每个去噪步都要跑一遍**。
 
-T2I-Adapter 问的是：控制信号真的需要这么大的网络吗？它的回答是一个很小的、**和时间步无关**的卷积网络就够了：
+T2I-Adapter 的出发点是：控制信号并不需要这么大的网络，一个很小的、**和时间步无关**的卷积网络就足够：
 
 1. 条件图（草图、边缘、深度、姿态……）经过一个约 7700 万参数的小网络，得到 4 个分辨率上的特征图；
 2. 这 4 个特征图**直接加**到冻结 U-Net 编码器对应分辨率的特征上；
@@ -30,7 +30,13 @@ T2I-Adapter 问的是：控制信号真的需要这么大的网络吗？它的�
 
 代价是控制精度一般略低于 ControlNet，好处是训练和推理都便宜得多，多个 adapter 还能直接加权相加组合使用。
 
-本文主要参考 T2I-Adapter 原论文 [[1]](#ref-1) 和官方仓库 [[2]](#ref-2)，Diffusers 的用法参考 [[3]](#ref-3)。正文里用 [n] 标出具体出处，完整列表见文末「参考资料」。
+## 参考资料
+
+本文主要参考 T2I-Adapter 原论文 [1] 和官方仓库 [2]，Diffusers 的用法参考 [3]。正文中用 [n] 标注具体出处。
+
+- <a id="ref-1"></a>**[1] 主论文**：Mou et al. *T2I-Adapter: Learning Adapters to Dig out More Controllable Ability for Text-to-Image Diffusion Models*. AAAI 2024. [arxiv.org/abs/2302.08453](https://arxiv.org/abs/2302.08453)。结构（论文图 3）、多尺度特征相加、组合控制、三次方时间步采样都来自这篇。
+- <a id="ref-2"></a>**[2] 官方仓库**：TencentARC/T2I-Adapter [github.com/TencentARC/T2I-Adapter](https://github.com/TencentARC/T2I-Adapter)。各种条件的 adapter 权重和训练代码。
+- <a id="ref-3"></a>**[3] Diffusers 文档**：Hugging Face Diffusers: T2I-Adapter [huggingface.co/docs/diffusers/en/using-diffusers/t2i_adapter](https://huggingface.co/docs/diffusers/en/using-diffusers/t2i_adapter)。第 6 节的推理和 `MultiAdapter`。
 
 ## 0. 全文路线
 
@@ -58,7 +64,7 @@ T2I-Adapter 问的是：控制信号真的需要这么大的网络吗？它的�
 
 T2I-Adapter 和 ControlNet 处理的都是第三类：条件图和输出图像素对齐，最自然的做法就是在 U-Net 里"同一个位置"把条件特征加进去。（IP-Adapter 处理的是前两类，见 [IP-Adapter 篇](/deep-learning/ip-adapter/)。）
 
-### 1.2 出发点：预训练模型其实已经"会"了
+### 1.2 出发点：预训练模型已具备结构生成能力
 
 论文的观察是：SD 本身已经有很强的结构生成能力，只是文本这个接口没法精确地指定结构。所以要学的不是"怎么画出这个结构"，而是"**怎么把外部的结构信号翻译成 U-Net 内部能听懂的特征**"。这个翻译任务比生成本身简单得多，一个小网络就够了。 [[1]](#ref-1)
 
@@ -597,9 +603,3 @@ def t2i_adapter_training_step(batch, vae, text_encoder, unet, adapter, noise_sch
 - 结构主要在高噪声阶段决定，所以训练用 $$t = (1 - u^3) T$$ 偏向大的时间步；推理时可以只在前一部分步上加 adapter。
 - 多个 adapter 可以直接按权重相加组合，不需要联合训练。
 - Diffusers 里特征走 `down_intrablock_additional_residuals`，不要和 ControlNet 的 `down_block_additional_residuals` 混用。
-
-## 参考资料
-
-- <a id="ref-1"></a>**[1] 主论文**：Mou et al. *T2I-Adapter: Learning Adapters to Dig out More Controllable Ability for Text-to-Image Diffusion Models*. AAAI 2024. [arxiv.org/abs/2302.08453](https://arxiv.org/abs/2302.08453)。结构（论文图 3）、多尺度特征相加、组合控制、三次方时间步采样都来自这篇。
-- <a id="ref-2"></a>**[2] 官方仓库**：TencentARC/T2I-Adapter [github.com/TencentARC/T2I-Adapter](https://github.com/TencentARC/T2I-Adapter)。各种条件的 adapter 权重和训练代码。
-- <a id="ref-3"></a>**[3] Diffusers 文档**：Hugging Face Diffusers: T2I-Adapter [huggingface.co/docs/diffusers/en/using-diffusers/t2i_adapter](https://huggingface.co/docs/diffusers/en/using-diffusers/t2i_adapter)。第 6 节的推理和 `MultiAdapter`。

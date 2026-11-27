@@ -587,7 +587,7 @@ $$
 
 常见的参数：
 
-- stride 的含义和 nn.Conv2d 完全不同，而是完全相反，倒是和 dilation 含义类似，它指的是**输入图片**的相邻的 pixels 之间的距离（即，把输入图片的 pixels 扩张一下）。默认是 1，即保持原样（而 nn.Conv2d 中则是 kernel 每次移动的步长）。
+- stride 的含义和 nn.Conv2d 完全不同，反而与 dilation 的含义类似，它指的是**输入图片**的相邻的 pixels 之间的距离（即，把输入图片的 pixels 扩张一下）。默认是 1，即保持原样（而 nn.Conv2d 中则是 kernel 每次移动的步长）。
 - Padding 含义也完全相反，padding = 0 时默认 kernel 在输入图片边缘处要到最外面（到再也不能向外为止）。而 padding > 0 则表示**去掉**图片边缘处的 padding 单位。即，padding = 0 默认值时输出图片最大，padding > 0 则逐渐减小（参考上面公式）；
 - dilation 含义和 nn.Conv2d 相同，即 spacing between kernel elements（**相邻的 kernel pixels** 之间的距离），默认是 1（即保持原样），具体含义可以参见链接 [1] 给出的动画。output_padding 则用的不多，指的是在输出图片上增加一个 padding，默认是 0。
 - output_padding 稍有些复杂，参考链接 [5]，默认是 0.
@@ -630,7 +630,7 @@ Transposed Convolution 的一个问题是容易生成 Checkerboard Artifacts（�
 - [如何理解似然函数? - 知乎](https://www.zhihu.com/question/54082000)
 - Quora问答：[https://www.quora.com/What-is-the-difference-between-probability-and-likelihood-1/answer/Jason-Eisner?share=cbfeda82&srid=zDgIt](https://www.quora.com/What-is-the-difference-between-probability-and-likelihood-1/answer/Jason-Eisner?share=cbfeda82&srid=zDgIt)
 
-究竟什么才是 likelihood？它和概率的区别是什么？其实非常容易。其实它俩就是同一个 function $P(x\vert\theta)$ 的两种不同的称呼：
+究竟什么才是 likelihood？它和概率的区别是什么？二者实际上是同一个 function $P(x\vert\theta)$ 的两种不同的称呼：
 
 - 如果已知 $\theta$，那么 $P(x\vert\theta)$  就是关于 $x$ 的函数（给定 $\theta$ )，它被称为概率；
 - 如果已知了 $x$，那么 $P(x\vert\mathbf{\theta})$ 就是 $\theta$ 的似然估计，即：已经观察到 $x$ 的情况下，什么样的 $\theta$ 才能最大可能得到观察值 $x$，即 the $\theta$ that maximize $P(x\vert\mathbf{\theta})$

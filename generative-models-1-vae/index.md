@@ -371,7 +371,7 @@ VAE 在这一步给了一个 reparameterization trick，充分利用了高斯分
 > - [[3] 另一个人的代码实现：GitHub - LiUzHiAn/VAE-Pytorch](https://github.com/LiUzHiAn/VAE-Pytorch)
 > - [4] 另一个博客的实现：[https://towardsdatascience.com/building-a-convolutional-vae-in-pytorch-a0f54c947f71](https://towardsdatascience.com/building-a-convolutional-vae-in-pytorch-a0f54c947f71)
 
-代码实现倒是挺简单的，注意的点就是 loss 的构成（参考上一章节的“VAE的原理和流程”介绍）。参考上面链接 [1] 和 [3] 足够了，两者几乎一致。
+代码实现较为简单，需要注意的是 loss 的构成（参考上一章节的“VAE的原理和流程”介绍）。可参考上面的链接 [1] 和 [3]，两者几乎一致。
 
 下面是 VAE 类的核心代码以及 VAE Loss代码：
 

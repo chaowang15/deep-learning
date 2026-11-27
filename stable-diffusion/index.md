@@ -35,11 +35,20 @@ description: "Classic Stable Diffusion 1.x module by module: CLIP text encoding,
 
 这一篇按数据流把这些模块逐个拆开，目标是**看懂一个 prompt 是怎么一步步变成一张图的，每一步的 tensor 是什么 shape，以及每个模块的核心代码怎么写**。以经典的 **Stable Diffusion 1.x（1.4 / 1.5）** 为准，生成 $$512 \times 512$$ 的图；SD 2.x、SDXL、SD3 的改动在相应位置简单提一下。
 
-本文主要参考 Latent Diffusion 论文 [[1]](#ref-1)（SD 就是它在大规模图文数据上的版本）和官方仓库 [[2]](#ref-2)；直观的图解推荐 [[5]](#ref-5)。正文里用 [n] 标出具体出处，完整列表见文末「参考资料」。
+## 参考资料
+
+本文主要参考 Latent Diffusion 论文 [1]（SD 就是它在大规模图文数据上的版本）和官方仓库 [2]；直观的图解推荐 [5]。正文中用 [n] 标注具体出处。
+
+- <a id="ref-1"></a>**[1] 主论文**：Rombach et al. *High-Resolution Image Synthesis with Latent Diffusion Models*. CVPR 2022. [arxiv.org/abs/2112.10752](https://arxiv.org/abs/2112.10752)。VAE latent、cross-attention 条件和整体结构都来自这篇，详见 [LDM 篇](/deep-learning/latent-diffusion/)。
+- <a id="ref-2"></a>**[2] 官方仓库**：CompVis/stable-diffusion [github.com/CompVis/stable-diffusion](https://github.com/CompVis/stable-diffusion)。SD 1.x 的原始代码和配置（`v1-inference.yaml` 里有 U-Net 的全部超参数）。
+- <a id="ref-3"></a>**[3] Diffusers 文档**：Hugging Face Diffusers [huggingface.co/docs/diffusers/en/index](https://huggingface.co/docs/diffusers/en/index)。第 6～8 节的 `UNet2DConditionModel`、scheduler 和 pipeline 用法。
+- <a id="ref-4"></a>**[4] CLIP**：Radford et al. *Learning Transferable Visual Models From Natural Language Supervision*. ICML 2021. [arxiv.org/abs/2103.00020](https://arxiv.org/abs/2103.00020)。第 2 节的文本编码器。
+- <a id="ref-5"></a>**[5] 图解博客（适合最先看）**：Jay Alammar. *The Illustrated Stable Diffusion*. [jalammar.github.io/illustrated-stable-diffusion/](https://jalammar.github.io/illustrated-stable-diffusion/)。把数据流画得很清楚，适合先看一遍建立整体印象。
+- <a id="ref-6"></a>**[6] CFG**：Ho, Salimans. *Classifier-Free Diffusion Guidance*. 2022. [arxiv.org/abs/2207.12598](https://arxiv.org/abs/2207.12598)。第 8 节推理时的引导。
 
 ## 背景与预备知识
 
-Stable Diffusion 是把几个已有的模块拼在一起：扩散模型、VAE、Transformer 的注意力、CLIP。这一节把每块需要的最少知识补齐，后面讲到时就不再从头解释。已经熟悉的读者可以直接跳到第 0 节。
+Stable Diffusion 由几个已有的模块组合而成：扩散模型、VAE、Transformer 的注意力、CLIP。本节介绍各模块所需的基础知识和概念，后文不再重复。熟悉这些内容的读者可以直接阅读第 0 节。
 
 ### 需要先知道的四样东西
 
@@ -52,7 +61,7 @@ Stable Diffusion 是把几个已有的模块拼在一起：扩散模型、VAE、
 
 ### CLIP：为什么它的文本向量"懂画面"
 
-CLIP [[4]](#ref-4) 有一个图像编码器和一个文本编码器，用约 4 亿个从网上收集的"图片 + 配文"对训练。训练目标很直接：**配对的图和文，向量要尽量相似；不配对的，要尽量不相似**（对比学习）。一个 batch 里有 $$N$$ 对图文时，核心代码只有几行：
+CLIP [[4]](#ref-4) 有一个图像编码器和一个文本编码器，用约 4 亿个从网上收集的"图片 + 配文"对训练。训练目标是：**配对的图和文，向量要尽量相似；不配对的，要尽量不相似**（对比学习）。一个 batch 里有 $$N$$ 对图文时，核心代码只有几行：
 
 ```python
 import torch
@@ -72,11 +81,11 @@ def clip_contrastive_loss(image_emb, text_emb, temperature=0.07):
 print(clip_contrastive_loss(torch.randn(8, 512), torch.randn(8, 512)))
 ```
 
-这样训练出来的文本编码器，输出的向量天然带着"这段话对应什么样的画面"的信息，比只在纯文本上训练的语言模型更适合指导画图。Stable Diffusion 只借用 CLIP 的**文本编码器**，并且冻结不训练。
+这样训练出来的文本编码器，输出的向量天然带着"这段话对应什么样的画面"的信息，比只在纯文本上训练的语言模型更适合指导图像生成。Stable Diffusion 只借用 CLIP 的**文本编码器**，并且冻结不训练。
 
-### Cross-attention：一个能跑的最小例子
+### Cross-attention：最小示例
 
-SD 里文本影响图像的唯一入口是 cross-attention（第 5.5 节）。它和 Transformer 里 Decoder 的 cross attention 是同一回事：**query 来自图像特征，key 和 value 来自文本**。用一个 $$2 \times 2$$ 的特征图（4 个位置）和 3 个文本 token 看一遍 shape：
+SD 里文本影响图像的唯一入口是 cross-attention（第 5.5 节）。它和 Transformer 里 Decoder 的 cross attention 是同一回事：**query 来自图像特征，key 和 value 来自文本**。用一个 $$2 \times 2$$ 的特征图（4 个位置）和 3 个文本 token 说明各步的 shape：
 
 ```python
 torch.manual_seed(0)
@@ -96,7 +105,7 @@ out = out.transpose(1, 2).reshape(1, d, 2, 2)  # 再变回特征图 [B, d, H, W]
 
 注意力矩阵 `A` 的第 $$i$$ 行就是"第 $$i$$ 个像素位置该听哪个词的"。SD 里这个矩阵是 `[B, heads, HW, 77]`，把某一个词对应的那一列取出来、变回 $$H \times W$$，就能看到这个词在图上"管"哪片区域，Prompt-to-Prompt 等图像编辑方法就是在操作这张图。
 
-### 一句话串起来
+### 整体流程
 
 训练时：图像经 VAE 编码成 latent，按 DDPM 的方式加噪，U-Net 一边看带噪 latent 和时间步、一边通过 cross-attention 读 CLIP 给出的文本向量，预测噪声，算 MSE。生成时：从随机 latent 出发，U-Net 在文本引导下反复去噪（用 DDIM 等采样器），最后交给 VAE 解码成图像。下面各节就按这条数据流逐个拆开。
 
@@ -1514,12 +1523,3 @@ assert abs(torch.cumprod(1 - betas, 0)[-1].sqrt().item() - 0.068) < 1e-3
 - **真实 SD 1.5 的 U-Net 比教学版多了什么？** ResBlock 后面的 attention 换成 Spatial Transformer（self-attention → cross-attention → GEGLU 前馈，都是 pre-norm 残差）；DownBlock 2 层、UpBlock 3 层；每层输出、每次下采样和 `conv_in` 都存 skip，共 12 条，UpBlock 每层 pop 一条。参数量 859,520,964。
 - **一次训练做什么？** 编码图像 → 随机 $$t$$ 和噪声一步加噪 → 编码文本（10% 置空）→ U-Net 预测噪声 → MSE → 只更新 U-Net。
 - **一次推理做什么？** 编码正向和负向 prompt 一次 → 从随机 latent 开始，每步 U-Net（batch 翻倍）+ CFG + scheduler → VAE 解码一次。
-
-## 参考资料
-
-- <a id="ref-1"></a>**[1] 主论文**：Rombach et al. *High-Resolution Image Synthesis with Latent Diffusion Models*. CVPR 2022. [arxiv.org/abs/2112.10752](https://arxiv.org/abs/2112.10752)。VAE latent、cross-attention 条件和整体结构都来自这篇，详见 [LDM 篇](/deep-learning/latent-diffusion/)。
-- <a id="ref-2"></a>**[2] 官方仓库**：CompVis/stable-diffusion [github.com/CompVis/stable-diffusion](https://github.com/CompVis/stable-diffusion)。SD 1.x 的原始代码和配置（`v1-inference.yaml` 里有 U-Net 的全部超参数）。
-- <a id="ref-3"></a>**[3] Diffusers 文档**：Hugging Face Diffusers [huggingface.co/docs/diffusers/en/index](https://huggingface.co/docs/diffusers/en/index)。第 6～8 节的 `UNet2DConditionModel`、scheduler 和 pipeline 用法。
-- <a id="ref-4"></a>**[4] CLIP**：Radford et al. *Learning Transferable Visual Models From Natural Language Supervision*. ICML 2021. [arxiv.org/abs/2103.00020](https://arxiv.org/abs/2103.00020)。第 2 节的文本编码器。
-- <a id="ref-5"></a>**[5] 图解博客（适合最先看）**：Jay Alammar. *The Illustrated Stable Diffusion*. [jalammar.github.io/illustrated-stable-diffusion/](https://jalammar.github.io/illustrated-stable-diffusion/)。把数据流画得很清楚，适合先看一遍建立整体印象。
-- <a id="ref-6"></a>**[6] CFG**：Ho, Salimans. *Classifier-Free Diffusion Guidance*. 2022. [arxiv.org/abs/2207.12598](https://arxiv.org/abs/2207.12598)。第 8 节推理时的引导。

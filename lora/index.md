@@ -25,7 +25,16 @@ description: "How LoRA fine-tunes large models by training a low-rank update: ma
 
 LoRA（Low-Rank Adaptation，Hu 等人，ICLR 2022，论文 *LoRA: Low-Rank Adaptation of Large Language Models*）的做法是：**冻结原模型的全部权重，只给其中一些线性层旁边加一对很小的矩阵 $$B A$$，训练时只更新这对矩阵**。它最早用在 GPT-3 这样的大语言模型上，后来几乎成了 [Stable Diffusion](/deep-learning/stable-diffusion/) 社区里"定制风格、人物、概念"的标准方式：一个 LoRA 文件只有几 MB 到几百 MB，可以随时加载、调强度、和别的 LoRA 叠加。
 
-本文主要参考 LoRA 原论文 [[1]](#ref-1)；Stable Diffusion 上的用法参考 Diffusers 文档 [[3]](#ref-3)，两个应用分别来自 DreamBooth [[4]](#ref-4) 和 AnimateDiff [[5]](#ref-5)。正文里用 [n] 标出具体出处，完整列表见文末「参考资料」。
+## 参考资料
+
+本文主要参考 LoRA 原论文 [1]；Stable Diffusion 上的用法参考 Diffusers 文档 [3]，两个应用分别来自 DreamBooth [4] 和 AnimateDiff [5]。正文中用 [n] 标注具体出处。
+
+- <a id="ref-1"></a>**[1] 主论文**：Hu et al. *LoRA: Low-Rank Adaptation of Large Language Models*. ICLR 2022. [arxiv.org/abs/2106.09685](https://arxiv.org/abs/2106.09685)。公式、初始化、α/r 缩放、GPT-3 上的结果和第 2.5 节的低秩分析（论文第 7 节）。
+- <a id="ref-2"></a>**[2] 官方代码**：microsoft/LoRA [github.com/microsoft/LoRA](https://github.com/microsoft/LoRA)。`loralib`，第 3 节的实现可以和它对照。
+- <a id="ref-3"></a>**[3] Diffusers LoRA 训练文档**：Hugging Face Diffusers: LoRA [huggingface.co/docs/diffusers/en/training/lora](https://huggingface.co/docs/diffusers/en/training/lora)。第 5 节 SD 上的训练脚本和加载方式。
+- <a id="ref-4"></a>**[4] DreamBooth**：Ruiz et al. *DreamBooth: Fine Tuning Text-to-Image Diffusion Models for Subject-Driven Generation*. CVPR 2023. [arxiv.org/abs/2208.12242](https://arxiv.org/abs/2208.12242)。第 6 节的稀有 token 和先验保留损失。
+- <a id="ref-5"></a>**[5] AnimateDiff**：Guo et al. *AnimateDiff: Animate Your Personalized Text-to-Image Diffusion Models without Specific Tuning*. ICLR 2024. [arxiv.org/abs/2307.04725](https://arxiv.org/abs/2307.04725)。第 7 节的运动模块和 MotionLoRA；代码在 [guoyww/AnimateDiff](https://github.com/guoyww/AnimateDiff)。
+- <a id="ref-6"></a>**[6] QLoRA**：Dettmers et al. *QLoRA: Efficient Finetuning of Quantized LLMs*. NeurIPS 2023. [arxiv.org/abs/2305.14314](https://arxiv.org/abs/2305.14314)。第 9 节变体表里的第一行。
 
 ## 0. 全文路线
 
@@ -738,12 +747,3 @@ def merge_loras_into(base_model_fn, loras, r=4, alpha=4.0):
 - 低秩之所以够用：微调主要是放大原模型已有但未被强调的方向，$$\Delta W$$ 的有效秩本来就很低。
 - 在 SD 里默认加在注意力的 q/k/v/out 上；$$r = 4$$ 只有约 80 万参数（U-Net 的 0.09%）。
 - 经典用法：DreamBooth 式的人物/物体定制（稀有 token + 先验保留）、风格 LoRA、视频里的 AnimateDiff（图像 LoRA 直接复用，MotionLoRA 学镜头运动）；多个 LoRA 可以按权重叠加。
-
-## 参考资料
-
-- <a id="ref-1"></a>**[1] 主论文**：Hu et al. *LoRA: Low-Rank Adaptation of Large Language Models*. ICLR 2022. [arxiv.org/abs/2106.09685](https://arxiv.org/abs/2106.09685)。公式、初始化、α/r 缩放、GPT-3 上的结果和第 2.5 节的低秩分析（论文第 7 节）。
-- <a id="ref-2"></a>**[2] 官方代码**：microsoft/LoRA [github.com/microsoft/LoRA](https://github.com/microsoft/LoRA)。`loralib`，第 3 节的实现可以和它对照。
-- <a id="ref-3"></a>**[3] Diffusers LoRA 训练文档**：Hugging Face Diffusers: LoRA [huggingface.co/docs/diffusers/en/training/lora](https://huggingface.co/docs/diffusers/en/training/lora)。第 5 节 SD 上的训练脚本和加载方式。
-- <a id="ref-4"></a>**[4] DreamBooth**：Ruiz et al. *DreamBooth: Fine Tuning Text-to-Image Diffusion Models for Subject-Driven Generation*. CVPR 2023. [arxiv.org/abs/2208.12242](https://arxiv.org/abs/2208.12242)。第 6 节的稀有 token 和先验保留损失。
-- <a id="ref-5"></a>**[5] AnimateDiff**：Guo et al. *AnimateDiff: Animate Your Personalized Text-to-Image Diffusion Models without Specific Tuning*. ICLR 2024. [arxiv.org/abs/2307.04725](https://arxiv.org/abs/2307.04725)。第 7 节的运动模块和 MotionLoRA；代码在 [guoyww/AnimateDiff](https://github.com/guoyww/AnimateDiff)。
-- <a id="ref-6"></a>**[6] QLoRA**：Dettmers et al. *QLoRA: Efficient Finetuning of Quantized LLMs*. NeurIPS 2023. [arxiv.org/abs/2305.14314](https://arxiv.org/abs/2305.14314)。第 9 节变体表里的第一行。
