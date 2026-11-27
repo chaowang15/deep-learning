@@ -1,0 +1,11 @@
+# Default (Mac Apple Silicon / CPU / any platform). PyPI torch on macOS includes MPS support.
+# Windows + CUDA: use requirements-cuda121.txt instead.
+torch
+torchvision
+
+matplotlib
+tqdm
+jupyter
+ipykernel
+pyyaml
+pytest
