@@ -70,36 +70,44 @@ DDPM 的完整流程可以拆成五步，每一步都能单独理解、单独检
   <rect x="20" y="30" width="190" height="78" rx="10" fill="#eef4ff" stroke="#2a6fdb"/>
   <text x="115" y="56" text-anchor="middle">数据归一化</text>
   <text x="115" y="76" text-anchor="middle" class="sm">像素 [0,1] → [-1,1]</text>
-  <text x="115" y="95" text-anchor="middle" class="sm">灰度也保留通道维 C=1</text>
+  <text x="115" y="95" text-anchor="middle" class="sm">灰度图也保留通道维</text>
   <rect x="20" y="200" width="190" height="78" rx="10" fill="#eef4ff" stroke="#2a6fdb"/>
   <text x="115" y="226" text-anchor="middle">噪声调度</text>
   <text x="115" y="246" text-anchor="middle" class="mono">make_beta_schedule(T)</text>
-  <text x="115" y="265" text-anchor="middle" class="sm">β, α, ᾱ, √ᾱ, √(1−ᾱ) …</text>
+  <text x="115" y="265" text-anchor="middle" class="sm">每个时间步的系数表</text>
   <rect x="250" y="125" width="130" height="50" rx="10" fill="#f8f9fa" stroke="#98a2b3"/>
   <text x="315" y="148" text-anchor="middle">随机时间步 t</text>
   <text x="315" y="166" text-anchor="middle" class="sm">每张图各抽一个</text>
   <rect x="420" y="105" width="170" height="90" rx="10" fill="#fff4ec" stroke="#e0662b"/>
   <text x="505" y="133" text-anchor="middle">前向加噪</text>
   <text x="505" y="153" text-anchor="middle" class="mono">q_sample(x0, t, …)</text>
-  <text x="505" y="176" text-anchor="middle" class="sm">x_t = √ᾱ_t·x0 + √(1−ᾱ_t)·ε</text>
+  <text x="505" y="176" text-anchor="middle" class="sm">按图下公式混合 x0 和噪声</text>
   <rect x="630" y="70" width="110" height="46" rx="10" fill="#fff" stroke="#475467"/>
-  <text x="685" y="98" text-anchor="middle">x_t</text>
+  <text x="685" y="98" text-anchor="middle">带噪图像 xt</text>
   <rect x="630" y="185" width="110" height="46" rx="10" fill="#fff" stroke="#475467"/>
-  <text x="685" y="213" text-anchor="middle">ε（训练目标）</text>
+  <text x="685" y="213" text-anchor="middle">噪声 noise</text>
   <path d="M210,69 C330,69 330,120 418,135" fill="none" stroke="#475467" marker-end="url(#ar)"/>
   <text x="300" y="62" class="mono">x0 [B,C,H,W]</text>
   <path d="M210,239 C330,239 340,190 418,170" fill="none" stroke="#475467" marker-end="url(#ar)"/>
-  <text x="228" y="296" class="mono">√ᾱ, √(1−ᾱ) [T]</text>
+  <text x="228" y="296" class="mono">系数表 [T]</text>
   <path d="M380,150 L418,150" fill="none" stroke="#475467" marker-end="url(#ar)"/>
   <text x="399" y="195" text-anchor="middle" class="mono">t [B]</text>
   <path d="M590,135 L628,98" fill="none" stroke="#475467" marker-end="url(#ar)"/>
   <path d="M590,170 L628,205" fill="none" stroke="#475467" marker-end="url(#ar)"/>
   <text x="685" y="134" text-anchor="middle" class="mono">[B,C,H,W]</text>
   <text x="685" y="250" text-anchor="middle" class="mono">[B,C,H,W]</text>
-  <text x="685" y="300" text-anchor="middle" class="sm">→ 第 2 篇：网络用 (x_t, t) 预测 ε</text>
+  <text x="685" y="300" text-anchor="middle" class="sm">noise 是训练目标</text>
 </svg>
-<figcaption>本篇三个部分之间的数据流和 tensor shape。</figcaption>
+<figcaption>本篇三个部分之间的数据流和 tensor shape。框里用的是代码变量名，对应的公式见下。</figcaption>
 </figure>
+
+图中"前向加噪"一步做的就是（第 4 节详细推导）：
+
+$$
+x_t = \sqrt{\bar\alpha_t}\, x_0 + \sqrt{1-\bar\alpha_t}\, \epsilon
+$$
+
+其中两个系数 $$\sqrt{\bar\alpha_t}$$、$$\sqrt{1-\bar\alpha_t}$$ 来自"噪声调度"算好的系数表，按每张图的时间步 $$t$$ 查出来；输出 `xt` 就是 $$x_t$$，`noise` 就是 $$\epsilon$$，它是后面训练网络时要预测的目标。
 
 ## 2. 数据归一化
 
