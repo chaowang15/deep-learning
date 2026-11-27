@@ -1,6 +1,6 @@
-# Codex Notes for Diffusion Learning
+# Agent Notes for Diffusion Learning
 
-This file captures project-specific working context for Codex sessions.
+Project-specific working context for coding agents (Codex, Claude Code).
 
 ## Project Goal
 
@@ -16,40 +16,26 @@ The current implementation focuses on:
 6. DDPM training loss
 7. sampling / reverse process
 
-## Environment
+## Location and Environment
 
-Use Windows PowerShell with the Windows Conda environment:
+This code lives in the blog repo `chaowang15/deep-learning` under `code/diffusion/` (imported with full git history from the old `deep_learning_lab` repo on 2026-11-27; develop here from now on). Jekyll excludes `code/`.
 
-```powershell
-cd C:\dev\deep_learning_lab\diffusion
+Main machine: Mac (Apple Silicon). Use `requirements.txt` (PyPI torch, MPS backend). The Windows desktop (RTX 3080) uses `requirements-cuda121.txt`.
+
+```bash
+cd code/diffusion
 conda activate diffusion
+python scripts/check_env.py   # cuda / mps / cpu
+python -m pytest -q
 ```
-
-The expected CUDA check on the desktop machine is:
-
-```text
-torch 2.4.1+cu121
-cuda available: True
-gpu: NVIDIA GeForce RTX 3080
-```
-
-Do not use the old WSL/venv setup for this project unless the user explicitly switches back.
 
 ## Data
 
-Datasets live at the repo root:
+Datasets live at `code/data/` (configs use `../data` relative to `code/diffusion/`). `data/` is ignored by Git. Only small sample runs happen here; large-scale training goes to a separate repo.
 
-```text
-deep_learning_lab/data/
-```
+## Stage numbering
 
-From inside `diffusion/`, configs use:
-
-```text
-../data
-```
-
-`data/` is ignored by Git and should not be committed.
+Each stage = one notebook + its `src/` modules; the first docstring line of every `src/*.py` names its stage. Keep the table in README.md in sync when a stage is finished.
 
 ## Current Progress
 
@@ -112,41 +98,7 @@ Do not jump directly to `p_sample`: it depends on a trained noise predictor.
 
 ## Handoff Checklist for a New Machine
 
-After cloning the repo:
-
-```powershell
-cd C:\dev\deep_learning_lab\diffusion
-conda create -n diffusion python=3.10 -y
-conda activate diffusion
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-python -m ipykernel install --user --name diffusion --display-name "Python (conda diffusion)"
-```
-
-Then run or inspect:
-
-```powershell
-python -c "import torch; print(torch.__version__); print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU only')"
-```
-
-Open VS Code Notebook with kernel:
-
-```text
-Python (conda diffusion)
-```
-
-Re-run:
-
-```text
-notebooks/00_check_dataset.ipynb
-notebooks/01_forward_process.ipynb
-```
-
-The next coding task should start from:
-
-```text
-src/time_embedding.py
-```
+See README.md "环境". Then run `python -m pytest -q` and re-run notebooks 00 and 01.
 
 ## Coding Style
 
@@ -174,7 +126,7 @@ For source modules:
 
 Before committing:
 
-```powershell
+```bash
 git status --short
 ```
 
@@ -188,12 +140,12 @@ Do not commit:
 
 Useful checks:
 
-```powershell
-python -m py_compile diffusion/src/schedule.py diffusion/src/forward_process.py
+```bash
+python -m pytest -q
 ```
 
 Notebook JSON can be checked with:
 
-```powershell
-python -m json.tool diffusion/notebooks/01_forward_process.ipynb > $null
+```bash
+python -m json.tool notebooks/01_forward_process.ipynb > /dev/null
 ```

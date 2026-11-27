@@ -1,1 +1,1 @@
-"""Step 3: implement timestep embeddings here."""
+"""Stage 02 (notebooks/02_noise_prediction.ipynb): sinusoidal timestep embedding. TODO."""

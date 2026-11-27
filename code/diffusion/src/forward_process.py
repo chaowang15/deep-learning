@@ -1,4 +1,4 @@
-"""Step 2: implement q_sample and forward diffusion visualizations here."""
+"""Stage 01 (notebooks/01_forward_process.ipynb): q_sample, the forward noising formula."""
 
 import torch
 

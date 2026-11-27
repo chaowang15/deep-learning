@@ -1,4 +1,4 @@
-"""Step 1: implement the diffusion noise schedule here."""
+"""Stage 01 (notebooks/01_forward_process.ipynb): noise schedule beta / alpha / alpha_bar."""
 
 import torch
 

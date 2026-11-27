@@ -1,0 +1,15 @@
+# Minimal project file. Not meant to be pip-installed: notebooks and tests
+# import modules as `from src.xxx import ...` with code/diffusion/ as the root.
+[project]
+name = "diffusion-learning"
+version = "0.1.0"
+description = "DDPM from scratch, one notebook per stage"
+requires-python = ">=3.10"
+dependencies = ["torch", "torchvision", "matplotlib", "tqdm", "pyyaml"]
+
+[project.optional-dependencies]
+dev = ["pytest", "jupyter", "ipykernel"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

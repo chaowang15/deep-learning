@@ -1,20 +1,14 @@
-# Deep Learning Lab
+# code/：学习代码
 
-Personal learning repo for deep learning topics implemented from scratch.
+博客文章对应的学习代码。Jekyll 构建时排除整个 `code/` 目录，它不会出现在网站上，只在 GitHub 上可见。
 
-Current modules:
+| 目录 | 内容 |
+|---|---|
+| [`diffusion/`](diffusion/) | DDPM 从零实现，一个阶段一个 notebook |
+| [`_template/`](_template/) | 新论文 / 新主题学习项目的骨架，复制后改名即可 |
 
-- `diffusion/`: DDPM diffusion learning project with notebooks, configs, and step-by-step source modules.
+约定：
 
-Shared datasets live in `data/`, which is intentionally ignored by Git.
-
-## Current Focus
-
-The first track is diffusion:
-
-1. Build and visualize the noise schedule.
-2. Implement the forward noising process.
-3. Train a noise prediction model.
-4. Implement DDPM sampling.
-5. Explore DDIM and classifier-free guidance.
-
+- 数据放 `code/data/`，生成结果放各项目的 `outputs/`，都不进 git。
+- 这里只跑小样本例子；真正的大规模训练另开仓库。
+- 开新主题：`cp -r code/_template code/<topic>`，然后按 `_template/README.md` 填。

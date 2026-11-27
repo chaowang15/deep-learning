@@ -1,1 +1,1 @@
-"""Step 4: implement the noise-prediction U-Net here."""
+"""Stage 02 (notebooks/02_noise_prediction.ipynb): small U-Net that predicts noise. TODO."""

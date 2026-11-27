@@ -1,1 +1,1 @@
-"""Step 6: write the training loop here after the core modules are ready."""
+"""Stage 03 (notebooks/03_ddpm_training.ipynb): training loop. TODO."""
