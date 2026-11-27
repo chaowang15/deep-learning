@@ -33,13 +33,23 @@ def image_settings_for_dataset(name: DatasetName) -> tuple[int, int]:
     raise ValueError(f"Unsupported dataset: {name}")
 
 
+def scale_to_minus_one_one(x: torch.Tensor) -> torch.Tensor:
+    """[0, 1] -> [-1, 1].
+
+    A module-level function, not a lambda: on macOS (and Windows) DataLoader
+    workers are started with "spawn" and must pickle the transform, and a
+    lambda cannot be pickled. With a lambda, num_workers > 0 crashes on Mac.
+    """
+    return x * 2.0 - 1.0
+
+
 def build_transform(image_size: int) -> transforms.Compose:
     """Convert images to tensors normalized from [0, 1] into [-1, 1]."""
     return transforms.Compose(
         [
             transforms.Resize(image_size),
             transforms.ToTensor(),
-            transforms.Lambda(lambda x: x * 2.0 - 1.0),
+            scale_to_minus_one_one,
         ]
     )
 

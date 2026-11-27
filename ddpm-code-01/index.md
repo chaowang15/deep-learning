@@ -3,7 +3,7 @@ date: 2026-11-26 16:30:00 -0800
 keywords: >-
   DDPM from scratch, PyTorch, dataset normalization, linear beta schedule, alpha_bar, q_sample, tensor shapes.
 summary: >-
-  DDPM 从零实现系列第一篇：对照自己写的代码，讲清楚数据如何归一化到 [-1, 1]、线性 beta schedule 算出哪些量、q_sample 如何用一个闭式公式把 x_0 一步加噪到 x_t。每个模块给出输入输出和 tensor shape，附运行结果图、自检测试和面试要点。
+  DDPM 从零实现系列第一篇：对照自己写的代码，讲清楚数据如何归一化到 [-1, 1]、线性 beta schedule 算出哪些量、q_sample 如何用一个闭式公式把 x_0 一步加噪到 x_t。每个模块逐项对照公式和代码、标出 tensor shape，并总结广播、下标、device、pickle 等实现上的易错点，附运行结果、自检测试和面试要点。
 layout: note
 title: "DDPM 代码解读（一）：数据、噪声调度与前向加噪"
 description: "DDPM from scratch, part 1: dataset normalization, the linear beta schedule, and the forward noising process q_sample, with tensor shapes and results."
@@ -107,101 +107,159 @@ $$
 
 ## 3. 逐块解读
 
+每个模块按同样的顺序讲：**公式 → 公式和代码逐项对应 → 核心代码 → 易错点**。易错点里标了"代码注释"的，是我写代码时在注释里记下的坑；其余是这次整理时补充的。
+
 ### 3.1 数据：`datasets.py`
 
 源码：[`src/datasets.py`](https://github.com/chaowang15/deep-learning/blob/main/code/diffusion/src/datasets.py)
 
-| | 内容 |
-|---|---|
-| 输入 | `DatasetConfig(name, data_dir, image_size, channels, batch_size, ...)` |
-| 输出 | `DataLoader`，每个 batch 是 `images [B, C, H, W]`、`labels [B]` |
-| 取值范围 | `images` 在 $$[-1, 1]$$ |
-| shape | MNIST / FashionMNIST：`[B, 1, 28, 28]`；CIFAR-10：`[B, 3, 32, 32]` |
+**公式。** 把像素从 $$[0, 1]$$ 线性映射到 $$[-1, 1]$$，显示时再映射回去：
 
-核心只有归一化这一步：
+$$
+x = 2u - 1,\quad u \in [0, 1] \qquad\Longleftrightarrow\qquad u = \frac{x + 1}{2}
+$$
+
+| 公式 | 代码 | shape |
+|---|---|---|
+| 原始像素 $$\in \{0,\dots,255\}$$ → $$u \in [0,1]$$ | `transforms.ToTensor()`（内部除以 255，并把 HWC 转成 CHW） | `[C, H, W]` |
+| $$x = 2u - 1$$ | `scale_to_minus_one_one(x)`：`x * 2.0 - 1.0` | `[C, H, W]` |
+| 一个 batch 的 $$x_0$$ | `DataLoader` 输出的 `images` | `[B, C, H, W]` |
+| $$u = (x+1)/2$$ | `denormalize(images)`：`(images.clamp(-1, 1) + 1) / 2` | 不变 |
 
 ```python
+def scale_to_minus_one_one(x):
+    return x * 2.0 - 1.0          # [0, 1] → [-1, 1]
+
 def build_transform(image_size):
     return transforms.Compose([
         transforms.Resize(image_size),
-        transforms.ToTensor(),                     # uint8 → float，[0, 1]
-        transforms.Lambda(lambda x: x * 2.0 - 1.0),  # [0, 1] → [-1, 1]
+        transforms.ToTensor(),      # uint8 HWC → float CHW，[0, 1]
+        scale_to_minus_one_one,
     ])
 
 def denormalize(images):
     return (images.clamp(-1.0, 1.0) + 1.0) / 2.0  # 画图前再变回 [0, 1]
 ```
 
-为什么是 $$[-1, 1]$$：噪声 $$\epsilon$$ 是均值 0、方差 1 的高斯，数据也以 0 为中心、尺度相近，两者按 $$\sqrt{\bar\alpha_t}$$ 和 $$\sqrt{1-\bar\alpha_t}$$ 混合时才"势均力敌"。采样阶段最后也会把输出 clamp 到 $$[-1, 1]$$ 再变回图片。
+为什么是 $$[-1, 1]$$：噪声 $$\epsilon$$ 均值 0、方差 1，数据也以 0 为中心、尺度相近，两者按 $$\sqrt{\bar\alpha_t}$$ 和 $$\sqrt{1-\bar\alpha_t}$$ 混合时才"势均力敌"。
 
-注意灰度图也**保留通道维** `C=1`。后面所有代码都按 `[B, C, H, W]` 写，同一套代码对灰度和 RGB 都能用。
+> **易错点**
+>
+> 1. **灰度图也要保留通道维 `C=1`**（代码注释）。MNIST 一个 batch 是 `[B, 1, 28, 28]` 而不是 `[B, 28, 28]`。后面所有代码都按 `[B, C, H, W]` 写，灰度和 RGB 才能共用一套代码；U-Net 的第一层卷积也需要这个 `C`。
+> 2. **不要在 transform 里写 `lambda`。** 最初的写法是 `transforms.Lambda(lambda x: x * 2.0 - 1.0)`。在 macOS（和 Windows）上，`DataLoader` 的 `num_workers > 0` 会用 spawn 方式启动子进程，需要 pickle 整个 transform，而 lambda 无法 pickle，会直接报 `Can't get local object 'build_transform.<locals>.<lambda>'`。notebook 里用的是 `num_workers=0` 所以没暴露，但 config 里的 `num_workers: 2` 在 Mac 上训练时就会崩。这次整理已改成模块级函数，并加了测试。
+> 3. **`denormalize` 里先 `clamp`。** 现在输入都在 $$[-1, 1]$$ 内，看起来多余；但到了采样阶段，模型输出可能略微越界，不 clamp 的话 `imshow` 会报 warning 或者颜色失真。
+> 4. **相对路径按项目目录解析，而不是当前工作目录。** `data_dir: ../data` 是相对 `code/diffusion/` 的；notebook 的工作目录是 `notebooks/`，如果直接用 `Path("../data")` 就会指到错误的位置。代码里用 `PROJECT_DIR / root` 解决了这个问题。
 
 ### 3.2 噪声调度：`schedule.py`
 
 源码：[`src/schedule.py`](https://github.com/chaowang15/deep-learning/blob/main/code/diffusion/src/schedule.py)
 
-输入是总步数 `T` 和 $$\beta$$ 的起止值，输出一个字典，**每一项都是 shape `[T]` 的一维 tensor**，下标就是 timestep。
+**公式。** 线性 schedule 和它派生出的量：
+
+$$
+\beta_t = \beta_{\text{start}} + \frac{t}{T-1}(\beta_{\text{end}} - \beta_{\text{start}}),\qquad
+\alpha_t = 1 - \beta_t,\qquad
+\bar\alpha_t = \prod_{s=0}^{t} \alpha_s
+$$
+
+为阶段 04（反向采样）提前准备的两个量，来自后验 $$q(x_{t-1} \mid x_t, x_0)$$：
+
+$$
+\mu_\theta(x_t, t) = \frac{1}{\sqrt{\alpha_t}}\Big(x_t - \frac{\beta_t}{\sqrt{1-\bar\alpha_t}}\,\epsilon_\theta(x_t, t)\Big),\qquad
+\tilde\beta_t = \frac{1-\bar\alpha_{t-1}}{1-\bar\alpha_t}\,\beta_t
+$$
+
+| 公式 | 代码 | shape |
+|---|---|---|
+| $$\beta_t$$ | `betas = torch.linspace(beta_start, beta_end, T)` | `[T]` |
+| $$\alpha_t = 1 - \beta_t$$ | `alphas = 1.0 - betas` | `[T]` |
+| $$\bar\alpha_t = \prod_{s \le t} \alpha_s$$ | `alpha_bars = torch.cumprod(alphas, dim=0)` | `[T]` |
+| $$\sqrt{\bar\alpha_t}$$（$$x_0$$ 的系数） | `sqrt_alpha_bars` | `[T]` |
+| $$\sqrt{1-\bar\alpha_t}$$（噪声的系数） | `sqrt_one_minus_alpha_bars` | `[T]` |
+| $$1/\sqrt{\alpha_t}$$（$$\mu_\theta$$ 最外面的系数） | `sqrt_recip_alphas = torch.sqrt(1.0 / alphas)` | `[T]` |
+| $$\bar\alpha_{t-1}$$，约定 $$\bar\alpha_{-1} = 1$$ | `alpha_bars_prev = torch.cat([torch.ones(1), alpha_bars[:-1]])` | `[T]` |
+| $$\tilde\beta_t$$ | `posterior_variance = betas * (1 - alpha_bars_prev) / (1 - alpha_bars)` | `[T]` |
+
+代码里把采样公式直接写成了注释，方便对照（代码注释）：
 
 ```python
-betas = torch.linspace(beta_start, beta_end, T)       # β_t，线性从 1e-4 到 0.02
-alphas = 1.0 - betas                                   # α_t
-alpha_bars = torch.cumprod(alphas, dim=0)              # ᾱ_t = α_0·α_1·…·α_t
-sqrt_alpha_bars = torch.sqrt(alpha_bars)               # x0 的系数
-sqrt_one_minus_alpha_bars = torch.sqrt(1.0 - alpha_bars)  # 噪声的系数
-
-# 下面两项是给阶段 04（反向采样）准备的
-sqrt_recip_alphas = torch.sqrt(1.0 / alphas)
-alpha_bars_prev = torch.cat([torch.ones(1), alpha_bars[:-1]])   # ᾱ_{t-1}，约定 ᾱ_{-1}=1
-posterior_variance = betas * (1.0 - alpha_bars_prev) / (1.0 - alpha_bars)  # β̃_t
+# p_sample:
+# x_{t-1} = mu_theta(x_t, t) + sigma_t * noise
+# mu_theta = sqrt_recip_alphas * (x_t - pred_noise * beta_t / sqrt_one_minus_alpha_bars)
+# sigma_t = sqrt(beta_tilde_t),  beta_tilde_t = posterior_variance
 ```
 
-| 键 | 含义 | 用在哪 | t=0 | t=299 |
-|---|---|---|---|---|
-| `betas` | 每步加噪强度 $$\beta_t$$ | 采样 | 0.0001 | 0.02 |
-| `alpha_bars` | 累计保留的信号比例 $$\bar\alpha_t$$ | 推导 | 0.9999 | 0.0481 |
-| `sqrt_alpha_bars` | $$x_0$$ 系数 | `q_sample` | 0.99995 | 0.219 |
-| `sqrt_one_minus_alpha_bars` | 噪声系数 | `q_sample`、采样 | 0.010 | 0.976 |
-| `sqrt_recip_alphas` | $$1/\sqrt{\alpha_t}$$ | 采样均值 | 1.00005 | 1.010 |
-| `posterior_variance` | $$\tilde\beta_t$$ | 采样方差 | 0 | 0.020 |
+每一项都是 shape `[T]` 的一维 tensor，下标就是 timestep。数值：
 
-两个容易写错的细节：
+| 键 | t=0 | t=299 |
+|---|---|---|
+| `betas` | 0.0001 | 0.02 |
+| `alpha_bars` | 0.9999 | 0.0481 |
+| `sqrt_alpha_bars` | 0.99995 | 0.219 |
+| `sqrt_one_minus_alpha_bars` | 0.010 | 0.976 |
+| `sqrt_recip_alphas` | 1.00005 | 1.010 |
+| `posterior_variance` | 0 | 0.020 |
 
-- `torch.cumprod` 是累乘，所以 $$\bar\alpha_t$$ 单调下降。代码里 timestep 从 0 开始编号，和论文从 1 开始差一位，只是记号不同。
-- `alpha_bars_prev` 在最前面补 1：$$t=0$$ 时"前一步"就是干净图像，信号保留比例为 1。这让 $$\tilde\beta_0 = 0$$，也就是采样的最后一步不再加噪声。
+> **易错点**
+>
+> 1. **下标从 0 开始。** 论文里 $$t = 1, \dots, T$$，代码里 $$t = 0, \dots, T-1$$。所以"最后一步"是 `T - 1`（本项目是 299），采样循环要写 `reversed(range(T))`，不是 `range(T, 0, -1)`。
+> 2. **`cumprod` 包含当前这一项。** `alpha_bars[i]` $$= \alpha_0 \alpha_1 \cdots \alpha_i$$。代码顶部的注释写的是 `alpha_bar_i = alpha_0 * ... * alpha_{i-1}`，少乘了一项，和 `cumprod` 实际算的不一致，按注释推导会差一步。（注释后续可以顺手改掉。）
+> 3. **`alpha_bars_prev` 要在最前面补 1**（代码注释）。$$t=0$$ 时"前一刻"就是干净图像，信号保留比例为 1。`torch.cat` 只接受 tensor，所以写 `torch.ones(1, device=device)` 而不是 Python 的 `1.0`，并且要和 `alpha_bars` 在同一个 device 上，否则 `cat` 会报错。
+> 4. **$$\tilde\beta_0 = 0$$ 是故意的。** 因为 $$\bar\alpha_{-1} = 1$$，分子为 0：采样的最后一步只取均值，不再加噪声。副作用是，如果以后要用 $$\log \tilde\beta_t$$（比如学习方差的改进版 DDPM），`log(0) = -inf`，常见做法是用 $$\tilde\beta_1$$ 替换第 0 项再取 log。
+> 5. **整张表只算一次。** schedule 不依赖数据，在训练开始前算好、作为常量查表；不要在每个 batch 里重新算。
 
 ### 3.3 前向加噪：`forward_process.py`
 
 源码：[`src/forward_process.py`](https://github.com/chaowang15/deep-learning/blob/main/code/diffusion/src/forward_process.py)
 
-| 参数 | shape | 说明 |
+**公式。** 闭式前向过程：
+
+$$
+x_t = \sqrt{\bar\alpha_t}\, x_0 + \sqrt{1-\bar\alpha_t}\, \epsilon,\qquad \epsilon \sim \mathcal{N}(0, I)
+$$
+
+| 公式 | 代码 | shape |
 |---|---|---|
-| `x0` | `[B, C, H, W]` | 干净图像，$$[-1, 1]$$ |
-| `t` | `[B]` | **每张图各自的** timestep |
-| `sqrt_alpha_bars`、`sqrt_one_minus_alpha_bars` | `[T]` | 来自 schedule |
-| `noise`（可选） | `[B, C, H, W]` | 不传就随机生成 |
-| 返回 `xt, noise` | 都是 `[B, C, H, W]` | `noise` 就是训练目标 |
+| $$x_0$$ | `x0` | `[B, C, H, W]` |
+| $$t$$（每张图各自一个） | `t` | `[B]` |
+| $$\epsilon \sim \mathcal{N}(0, I)$$ | `noise = torch.randn_like(x0)` | `[B, C, H, W]` |
+| $$\sqrt{\bar\alpha_t}$$ | `sqrt_alpha_bars[t].view(-1, 1, 1, 1)` | `[T]` → `[B]` → `[B, 1, 1, 1]` |
+| $$\sqrt{1-\bar\alpha_t}$$ | `sqrt_one_minus_alpha_bars[t].view(-1, 1, 1, 1)` | `[B, 1, 1, 1]` |
+| $$x_t = \dots$$ | `xt = sqrt_alpha_bar_t * x0 + sqrt_one_minus_alpha_bars_t * noise` | `[B, C, H, W]` |
+| 训练目标 $$\epsilon$$ | 返回值 `noise` | `[B, C, H, W]` |
 
 ```python
 def q_sample(x0, t, sqrt_alpha_bars, sqrt_one_minus_alpha_bars, noise=None):
     if noise is None:
         noise = torch.randn_like(x0)
 
-    # 用 t 做索引取出每张图自己的系数：[T] → [B]，再变成 [B, 1, 1, 1]
-    sqrt_alpha_bar_t = sqrt_alpha_bars[t].view(-1, 1, 1, 1)
-    sqrt_one_minus_alpha_bar_t = sqrt_one_minus_alpha_bars[t].view(-1, 1, 1, 1)
+    t = t.to(device=x0.device, dtype=torch.long)
+    sqrt_alpha_bars = sqrt_alpha_bars.to(device=x0.device, dtype=x0.dtype)
+    sqrt_one_minus_alpha_bars = sqrt_one_minus_alpha_bars.to(device=x0.device, dtype=x0.dtype)
 
-    # [B,1,1,1] 与 [B,C,H,W] 广播相乘：同一张图的所有像素用同一个系数
-    xt = sqrt_alpha_bar_t * x0 + sqrt_one_minus_alpha_bar_t * noise
+    # [B] => [B, 1, 1, 1]
+    sqrt_alpha_bar_t = sqrt_alpha_bars[t].view(-1, 1, 1, 1)
+    sqrt_one_minus_alpha_bars_t = sqrt_one_minus_alpha_bars[t].view(-1, 1, 1, 1)
+
+    xt = sqrt_alpha_bar_t * x0 + sqrt_one_minus_alpha_bars_t * noise
     return xt, noise
 ```
 
-关键在 `.view(-1, 1, 1, 1)`。`sqrt_alpha_bars[t]` 是 `[B]`，直接和 `[B, C, H, W]` 相乘会按**最后一维**对齐而报错（或者更糟，碰巧 shape 对上而算错）。变成 `[B, 1, 1, 1]` 后，广播规则让第 i 张图的所有像素都乘上第 i 个系数。
-
-完整代码里还把 `t`、系数搬到和 `x0` 相同的 device 和 dtype 上，这样 schedule 在 CPU 上建好，图片在 GPU / MPS 上也能直接用。
+> **易错点**
+>
+> 1. **`[B]` 必须变成 `[B, 1, 1, 1]` 再乘**（代码注释）。PyTorch 广播从**最后一维**开始对齐：`[B]` 直接乘 `[B, C, H, W]` 时，`B` 会去和 `W` 对齐。大多数时候会报错；但如果碰巧 `B == W`（比如 batch 是 28、图是 28×28），它**不会报错而是悄悄算错**，每一列像素乘上了不同图的系数。`.view(-1, 1, 1, 1)` 让第 i 张图的所有像素都乘第 i 个系数。
+> 2. **`t` 是 `[B]`，不是标量。** 训练时 batch 里每张图独立随机抽 timestep，所以必须"按图查表"：`sqrt_alpha_bars[t]` 是用一个整数 tensor 做索引，一次取出 B 个系数。
+> 3. **索引用的 `t` 必须是 `long`，并且和被索引的表在同一个 device 上。** schedule 通常在 CPU 上建好，图片在 GPU / MPS 上；用 GPU 上的 `t` 去索引 CPU 上的表会报 device 不一致。代码里统一把 `t` 和两张表搬到 `x0.device`，并把系数转成 `x0.dtype`，这样以后用半精度（AMP）也不会因为 float32 × float16 而类型提升。
+> 4. **一定要把 `noise` 返回。** 训练的 loss 是 $$\lVert \epsilon - \epsilon_\theta(x_t, t) \rVert^2$$，目标必须是**生成这个 $$x_t$$ 时用的同一份噪声**。如果在外面再随机一份当目标，目标和输入就没有关系了，loss 永远降不下去。
+> 5. **`noise` 参数可以从外面传入。** 测试和可视化时传固定的 noise，就能把结果和公式逐元素对比（见第 5 节的测试）。
 
 ### 3.4 可视化里的 batch 小技巧：`repeat_interleave` vs `repeat`
 
-[`01_forward_process.ipynb`](https://github.com/chaowang15/deep-learning/blob/main/code/diffusion/notebooks/01_forward_process.ipynb) 想把 3 张图各自在 6 个 timestep 下的加噪结果排成一个网格，一次 `q_sample` 算完：
+[`01_forward_process.ipynb`](https://github.com/chaowang15/deep-learning/blob/main/code/diffusion/notebooks/01_forward_process.ipynb) 想把 3 张图各自在 6 个 timestep 下的加噪结果排成一个网格，一次 `q_sample` 算完。需要构造两个对齐的 batch：
+
+$$
+\text{第 } k \text{ 个元素} = \big(\,x_0^{(\lfloor k/6 \rfloor)},\ t_{(k \bmod 6)}\,\big),\qquad k = 0, \dots, 17
+$$
 
 ```python
 selected_steps = torch.tensor([0, 25, 50, 100, 200, T - 1])     # [6]
@@ -210,10 +268,14 @@ t_batch = selected_steps.repeat(num_images)                      # [6] → [18]
 xt, _ = q_sample(x0_batch, t_batch, sqrt_alpha_bars, sqrt_one_minus_alpha_bars)
 ```
 
-- `repeat_interleave` 是**逐元素**复制：`[img0, img1, img2]` → `[img0×6, img1×6, img2×6]`。
-- `repeat` 是**整体**复制：`[t0…t5]` → `[t0…t5, t0…t5, t0…t5]`。
-
-两者拼起来，第 k 个元素正好是"第 k//6 张图在第 k%6 个 timestep"。`make_grid(..., nrow=6)` 再按行排开，就是一张图一行。
+> **易错点**（代码注释）
+>
+> `repeat_interleave` 是**逐元素**复制，`repeat` 是**整体**复制。拿一张 RGB 图 `img` 的 shape `[3, 2, 2]` 举例：
+>
+> - `img.repeat_interleave(2, dim=0)` → `[R, R, G, G, B, B]`
+> - `img.repeat(2, 1, 1)` → `[R, G, B, R, G, B]`
+>
+> 两者输出 shape 完全相同（都是 `[6, 2, 2]`），都不增加新维度，只是 dim 0 上的顺序不同，所以**写反了也不会报错，只是图和 timestep 错位**。这里图片要"每张连续出现 6 次"，用 `repeat_interleave`；timestep 要"整段重复 3 次"，用 `repeat`。最后 `make_grid(..., nrow=6)` 按行排开，正好一张图一行。
 
 ## 4. 运行与结果
 
@@ -223,7 +285,7 @@ xt, _ = q_sample(x0_batch, t_batch, sqrt_alpha_bars, sqrt_one_minus_alpha_bars)
 cd code/diffusion
 python -m pip install -r requirements.txt
 python scripts/check_env.py      # Apple Silicon 上应显示 device: mps
-python -m pytest -q              # 6 passed
+python -m pytest -q              # 8 passed
 jupyter notebook                 # 打开 notebooks/00、01
 ```
 
@@ -250,6 +312,7 @@ jupyter notebook                 # 打开 notebooks/00、01
 
 [`tests/`](https://github.com/chaowang15/deep-learning/tree/main/code/diffusion/tests) 里放了几条不需要下载数据、一秒内跑完的检查，改完 `src/` 后跑 `python -m pytest -q`：
 
+- transform 可以被 pickle（Mac 上 `num_workers > 0` 不会崩），`denormalize` 能还原；
 - schedule 每一项 shape 都是 `[T]`，$$\bar\alpha_t$$ 单调下降；
 - $$(\sqrt{\bar\alpha_t})^2 + (\sqrt{1-\bar\alpha_t})^2 = 1$$；
 - $$\tilde\beta_0 = 0$$ 且 $$\tilde\beta_t \le \beta_t$$；
