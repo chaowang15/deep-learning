@@ -32,6 +32,8 @@ description: "Why latent diffusion runs DDPM inside an autoencoder's latent spac
 
 扩散的公式、训练目标、采样器一个都没改，改的只是"在哪个空间里扩散"。[Stable Diffusion](/deep-learning/stable-diffusion/) 就是这篇论文的放大版。本文把论文的思路、结构图、两阶段训练的细节都补齐，再用一个能在 CPU 上跑的 Tiny LDM 实际训练一遍。
 
+本文主要参考 LDM 原论文 [[1]](#ref-1) 和官方仓库 [[2]](#ref-2)；自编码器的训练方式来自 VQGAN [[3]](#ref-3)。正文里用 [n] 标出具体出处，完整列表见文末「参考资料」。
+
 ## 0. 全文路线
 
 | 节 | 内容 |
@@ -66,7 +68,7 @@ description: "Why latent diffusion runs DDPM inside an autoencoder's latent spac
 
 ### 1.2 感知压缩和语义压缩
 
-论文更深一层的论点是：**一张数字图像里大部分比特对应的是人眼察觉不到的细节**。作者分析了一个训练好的像素空间扩散模型的率失真曲线（rate–distortion，横轴是"用了多少比特"，纵轴是"重建误差"），发现学习过程可以粗略分成两段：
+论文更深一层的论点是：**一张数字图像里大部分比特对应的是人眼察觉不到的细节**。作者分析了一个训练好的像素空间扩散模型的率失真曲线（rate–distortion，横轴是"用了多少比特"，纵轴是"重建误差"），发现学习过程可以粗略分成两段 [[1]](#ref-1)：
 
 - **感知压缩**（perceptual compression）：去掉高频细节，误差下降很多，但学到的"语义"很少；
 - **语义压缩**（semantic compression）：真正的生成模型学的部分，学的是物体、构图、概念之间的关系。
@@ -112,7 +114,7 @@ LDM 的 latent 是**保留空间结构的二维特征图**，生成器是卷积 
 
 ### 2.1 结构图
 
-下面按论文图 3 的结构重画：左边是像素空间，中间是 latent 空间，右边是条件。
+下面按论文图 3 的结构重画：左边是像素空间，中间是 latent 空间，右边是条件。 [[1]](#ref-1)
 
 <figure class="ddpm-fig">
 <svg viewBox="0 0 760 470" role="img" aria-label="LDM 整体结构，按论文图 3 重画">
@@ -246,7 +248,7 @@ LDM 的 latent 是**保留空间结构的二维特征图**，生成器是卷积 
 
 ### 3.1 完整的训练目标
 
-论文的自编码器沿用了 VQGAN 的训练方式。只用 L1 或 L2 这种逐像素损失时，模型会对不确定的高频细节"取平均"，重建结果发糊；所以要再加两项让重建在**感知上**锐利：
+论文的自编码器沿用了 VQGAN 的训练方式。只用 L1 或 L2 这种逐像素损失时，模型会对不确定的高频细节"取平均"，重建结果发糊；所以要再加两项让重建在**感知上**锐利 [[3]](#ref-3)[[4]](#ref-4)：
 
 $$
 \mathcal{L}_{\text{AE}} =
@@ -289,7 +291,7 @@ def generator_gan_loss(logits_fake):
 
 ### 3.2 两种正则：KL-reg 和 VQ-reg
 
-论文同时实验了两种正则，对应两类模型（名字里的 KL / VQ 就是指这个）：
+论文同时实验了两种正则，对应两类模型（名字里的 KL / VQ 就是指这个） [[1]](#ref-1)：
 
 **KL-reg**：编码器输出一个对角高斯 $$q(z \mid x) = \mathcal{N}(\mu, \operatorname{diag}\sigma^2)$$，用重参数化采样，加一个对 $$\mathcal{N}(0, I)$$ 的 KL 惩罚：
 
@@ -410,7 +412,7 @@ def autoencoder_loss(model, x, kl_weight=1e-6):
 
 ## 4. 压缩倍数 f 怎么选
 
-$$f$$ 越大，latent 越小，扩散越便宜；但压得越狠，自编码器丢的信息越多，生成质量的上限越低。论文在类别条件 ImageNet 上用相同的参数量和训练步数比较了 $$f \in \{1, 2, 4, 8, 16, 32\}$$（$$f = 1$$ 就是像素空间扩散）：
+$$f$$ 越大，latent 越小，扩散越便宜；但压得越狠，自编码器丢的信息越多，生成质量的上限越低。论文在类别条件 ImageNet 上用相同的参数量和训练步数比较了 $$f \in \{1, 2, 4, 8, 16, 32\}$$（$$f = 1$$ 就是像素空间扩散） [[1]](#ref-1)：
 
 - **$$f = 1, 2$$ 训练进展慢**：大部分感知压缩的工作还留给扩散模型做，算力花在了像素级细节上；
 - **$$f = 32$$ 质量停滞**：第一阶段压得太狠，细节在自编码器里就丢了，扩散模型再好也补不回来；
@@ -537,7 +539,7 @@ def ldm_sample(unet, autoencoder, labels, sched, scale, latent_shape, num_steps=
 
 ### 6.1 cross-attention：通用的条件接口
 
-为了让同一套结构能接受文本、类别、图像表征等各种条件，LDM 用一个**领域相关的编码器** $$\tau_\theta$$ 把条件 $$y$$ 变成一串 token $$\tau_\theta(y) \in \mathbb{R}^{M \times d_\tau}$$，再在 U-Net 的中间层用 cross-attention 注入。把第 $$i$$ 层的特征图 $$\varphi_i(z_t)$$ 展平成 $$N$$ 个 token：
+为了让同一套结构能接受文本、类别、图像表征等各种条件，LDM 用一个**领域相关的编码器** $$\tau_\theta$$ 把条件 $$y$$ 变成一串 token $$\tau_\theta(y) \in \mathbb{R}^{M \times d_\tau}$$，再在 U-Net 的中间层用 cross-attention 注入。把第 $$i$$ 层的特征图 $$\varphi_i(z_t)$$ 展平成 $$N$$ 个 token [[1]](#ref-1)：
 
 $$
 Q = W_Q^{(i)} \cdot \varphi_i(z_t),\qquad
@@ -660,7 +662,7 @@ latent 不是什么抽象的语义向量：每个通道都是一张 $$8 \times 8
 
 ### 8.1 论文里的结果
 
-- **无条件生成**：CelebA-HQ $$256^2$$ 上 LDM-4 的 FID 为 5.11，当时的最好结果之一；
+- **无条件生成**：CelebA-HQ $$256^2$$ 上 LDM-4 的 FID 为 5.11，当时的最好结果之一； [[1]](#ref-1)
 - **类别条件 ImageNet**：LDM-4 加 classifier-free guidance（LDM-4-G）FID 3.60，和当时最强的像素空间扩散模型（ADM）相当，但参数量和训练算力都小得多；
 - **文生图**：在 LAION-400M 上训练了一个 14.5 亿参数的 KL-f8 模型（$$\tau_\theta$$ 是从头训的 Transformer），配合 classifier-free guidance，在 MS-COCO 上和同期大得多的模型（如 GLIDE、Make-A-Scene）有可比的 FID；
 - **超分、修补、语义合成**：都用拼接条件，用同一套框架覆盖了多种图像到图像的任务；
@@ -708,3 +710,10 @@ LDM 的整条链路是 $$x \to z \to \tilde x$$。即使扩散模型完美地生
 - 条件两种接法：$$\tau_\theta$$ + cross-attention（文本、类别），或者直接拼到输入（分割图、低分辨率图、修补）。
 - 训练要用编码器（或缓存的 latent），文生图推理只要解码器，且只跑一次。
 - 代价是自编码器的重建上限：细小文字、人脸、手是 latent 扩散的老问题。
+
+## 参考资料
+
+- <a id="ref-1"></a>**[1] 主论文**：Rombach et al. *High-Resolution Image Synthesis with Latent Diffusion Models*. CVPR 2022. [arxiv.org/abs/2112.10752](https://arxiv.org/abs/2112.10752)。结构图（论文图 3）、压缩倍数 f 的实验、两种正则、条件机制都来自这篇及其附录。
+- <a id="ref-2"></a>**[2] 官方仓库**：CompVis/latent-diffusion [github.com/CompVis/latent-diffusion](https://github.com/CompVis/latent-diffusion)。自编码器和 LDM 的配置、损失函数实现。
+- <a id="ref-3"></a>**[3] VQGAN**：Esser, Rombach, Ommer. *Taming Transformers for High-Resolution Image Synthesis*. CVPR 2021. [arxiv.org/abs/2012.09841](https://arxiv.org/abs/2012.09841)。第 3 节 L1 + LPIPS + PatchGAN 的自编码器训练方式。
+- <a id="ref-4"></a>**[4] LPIPS**：Zhang et al. *The Unreasonable Effectiveness of Deep Features as a Perceptual Metric*. CVPR 2018. [arxiv.org/abs/1801.03924](https://arxiv.org/abs/1801.03924)。感知损失。

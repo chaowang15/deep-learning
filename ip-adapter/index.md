@@ -30,6 +30,8 @@ description: "How IP-Adapter lets Stable Diffusion take an image as a prompt: CL
 
 训练完的 IP-Adapter 可以挂在同一底模的各种微调版本上，也可以和文本提示、ControlNet、T2I-Adapter 同时使用。
 
+本文主要参考 IP-Adapter 原论文 [[1]](#ref-1) 和官方仓库 [[2]](#ref-2)，Diffusers 的用法参考 [[3]](#ref-3)。正文里用 [n] 标出具体出处，完整列表见文末「参考资料」。
+
 ## 0. 全文路线
 
 | 节 | 内容 |
@@ -115,7 +117,7 @@ CLIP 的图像编码器和文本编码器是对齐训练的，它的图像嵌入
 
 ### 2.2 图像 token
 
-CLIP 图像编码器输出一个 1024 维的全局嵌入 $$e_{\text{img}}$$。一个 1024 维的向量直接拿去做 cross-attention 只有 1 个 token，表达力太弱，所以先用一个线性层把它展开成 $$N = 4$$ 个 token，再做 LayerNorm：
+CLIP 图像编码器输出一个 1024 维的全局嵌入 $$e_{\text{img}}$$。一个 1024 维的向量直接拿去做 cross-attention 只有 1 个 token，表达力太弱，所以先用一个线性层把它展开成 $$N = 4$$ 个 token，再做 LayerNorm [[1]](#ref-1)：
 
 $$
 c_i = \operatorname{LN}\big(\operatorname{reshape}(W_p\, e_{\text{img}} + b_p)\big) \in \mathbb{R}^{N \times 768},\qquad W_p \in \mathbb{R}^{(N \cdot 768) \times 1024}
@@ -125,7 +127,7 @@ $$
 
 ### 2.3 解耦 cross-attention
 
-原来的 cross-attention，$$Z$$ 是 U-Net 某一层的特征（作为 query），$$c_t$$ 是文本 token：
+原来的 cross-attention，$$Z$$ 是 U-Net 某一层的特征（作为 query），$$c_t$$ 是文本 token [[1]](#ref-1)：
 
 $$
 Z' = \operatorname{Attention}(Q, K, V) = \operatorname{Softmax}\Big(\frac{Q K^\top}{\sqrt d}\Big) V,\qquad
@@ -150,7 +152,7 @@ SD 1.5 的 U-Net 里有 16 个 cross-attention（编码器 6 个、中间 1 个�
 
 ### 2.4 为什么必须"解耦"
 
-最直接的想法是把 4 个图像 token 拼到 77 个文本 token 后面，变成 81 个 token，走原来的 cross-attention。论文对比过这种做法，效果明显差。原因有两个：
+最直接的想法是把 4 个图像 token 拼到 77 个文本 token 后面，变成 81 个 token，走原来的 cross-attention。论文对比过这种做法，效果明显差。原因有两个 [[1]](#ref-1)：
 
 1. **投影不对。** 原来的 $$W_k, W_v$$ 是为文本 token 训练的，现在冻结了。图像 token 只能靠前面的小投影层去"模仿"文本 token 的分布，才能被 $$W_k, W_v$$ 正确理解，这个约束太紧。解耦以后，图像有自己可训练的 $$W_k', W_v'$$。
 2. **两种 token 在同一个 softmax 里抢注意力。** 拼在一起时，注意力权重在 81 个 token 上归一化，图像 token 多拿一点，文本 token 就少拿一点，两者互相挤占，也没有一个干净的旋钮来调图像的强度。解耦以后两个 softmax 各自归一化，$$\lambda$$ 就是图像分支的强度。
@@ -285,7 +287,7 @@ with torch.no_grad():
 
 ### 4.1 数据和设置
 
-- 数据：约 1000 万图文对（LAION-2B 和 COYO-700M 的子集）。**参考图就是目标图本身**，不需要成对的"参考图 → 结果图"数据；
+- 数据：约 1000 万图文对（LAION-2B 和 COYO-700M 的子集）。**参考图就是目标图本身**，不需要成对的"参考图 → 结果图"数据； [[1]](#ref-1)
 - 底模：SD 1.5，图像编码器 OpenCLIP ViT-H/14，两者和文本编码器都冻结；
 - 分辨率 512，AdamW，学习率 $$10^{-4}$$，weight decay 0.01，8 张 V100 训练约 100 万步（每卡 batch 8）。
 
@@ -412,7 +414,7 @@ out = pipe(
 ).images[0]
 ```
 
-`load_ip_adapter` 会同时加载图像编码器（同一个仓库的 `models/image_encoder`，即 ViT-H/14），并把 U-Net 的 cross-attention 换成解耦版，也就是第 3 节做的事。`pipe.unload_ip_adapter()` 可以卸载，恢复原模型。
+`load_ip_adapter` 会同时加载图像编码器（同一个仓库的 `models/image_encoder`，即 ViT-H/14），并把 U-Net 的 cross-attention 换成解耦版，也就是第 3 节做的事。`pipe.unload_ip_adapter()` 可以卸载，恢复原模型。 [[3]](#ref-3)
 
 ### 6.2 和 ControlNet 一起用
 
@@ -454,7 +456,7 @@ for prompt in ["a cat on a sofa", "a cat in the snow", "a cat in a spaceship"]:
 
 ### 6.4 常用权重
 
-`h94/IP-Adapter` 仓库里 SD 1.5 的几个版本：
+`h94/IP-Adapter` 仓库里 SD 1.5 的几个版本 [[4]](#ref-4)：
 
 | 权重 | 图像特征 | token 数 | 适合 |
 |---|---|---|---|
@@ -482,7 +484,7 @@ FaceID 系列在单独的仓库里，需要额外的人脸识别模型和 LoRA�
 | **FaceID-Plus** | 身份嵌入 + CLIP 人脸特征 | 身份和脸部外观都保留 |
 | **SDXL 版** | 底模 SDXL，`cross_attention_dim` 2048 | 更高分辨率；基础版用 ViT-bigG，Plus 版用 ViT-H |
 
-结构的主干（解耦 cross-attention + 投影层）都不变，变的是"用什么特征表示参考图"和"变成几个 token"。
+结构的主干（解耦 cross-attention + 投影层）都不变，变的是"用什么特征表示参考图"和"变成几个 token"。 [[2]](#ref-2)
 
 ### 7.2 相关方法
 
@@ -512,3 +514,10 @@ FaceID 系列在单独的仓库里，需要额外的人脸识别模型和 LoRA�
 - SD 1.5 上只训练 2232 万参数；$$\lambda = 0$$ 精确退回原模型，但初始化不是零，$$\lambda = 1$$ 从第一步就有影响。
 - 训练用参考图 = 目标图，文本、图像、两者各以 0.05 的概率丢弃，丢图像就是把嵌入置零，推理时 CFG 的负分支同样用全零嵌入。
 - 推理时 λ 越大越像参考图、越不听文本；和 ControlNet / T2I-Adapter 作用在不同位置，可以直接组合成"参考图的外观 + 条件图的结构"。
+
+## 参考资料
+
+- <a id="ref-1"></a>**[1] 主论文**：Ye et al. *IP-Adapter: Text Compatible Image Prompt Adapter for Text-to-Image Diffusion Models*. 2023. [arxiv.org/abs/2308.06721](https://arxiv.org/abs/2308.06721)。解耦 cross-attention、图像投影、训练数据和丢弃比例都来自这篇（第 3、4 节）。
+- <a id="ref-2"></a>**[2] 官方仓库**：tencent-ailab/IP-Adapter [github.com/tencent-ailab/IP-Adapter](https://github.com/tencent-ailab/IP-Adapter)。训练脚本、Plus / FaceID 等变体的实现。
+- <a id="ref-3"></a>**[3] Diffusers 文档**：Hugging Face Diffusers: IP-Adapter [huggingface.co/docs/diffusers/en/using-diffusers/ip_adapter](https://huggingface.co/docs/diffusers/en/using-diffusers/ip_adapter)。第 6 节的加载、调强度、缓存嵌入。
+- <a id="ref-4"></a>**[4] 权重**：h94/IP-Adapter [huggingface.co/h94/IP-Adapter](https://huggingface.co/h94/IP-Adapter)。第 6.4 节列出的各个权重文件。

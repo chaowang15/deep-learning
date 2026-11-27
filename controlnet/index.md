@@ -33,6 +33,8 @@ description: "How ControlNet adds edge, depth and pose control to a frozen diffu
 
 因为第 3 步的卷积初始全为 0，刚开始训练时整个模型和原模型**完全一样**；训练只是在这个起点上，逐渐学会"按条件图修改各层特征"。下面先讲清这三点为什么这样设计，再用一个能跑的小模型真的训练一遍，最后给出 SD 1.5 上逐层精确的结构和实际用法。
 
+本文主要参考 ControlNet 原论文 [[1]](#ref-1) 和官方仓库 [[2]](#ref-2)。正文里用 [n] 标出具体出处，完整列表见文末「参考资料」。
+
 ## 0. 全文路线
 
 | 节 | 内容 |
@@ -96,7 +98,7 @@ ControlNet 的目标是：**原模型的能力一点不丢，同时学会听条�
 
 ### 2.1 一个 block 上的 ControlNet
 
-把网络里的一个模块（例如一组 ResBlock）记作 $$\mathcal{F}(\cdot;\Theta)$$，输入特征 $$x$$，输出 $$y = \mathcal{F}(x;\Theta)$$。ControlNet 对它做三件事：冻结 $$\Theta$$；复制一份参数 $$\Theta_c$$ 作为可训练拷贝；新增两个零卷积 $$\mathcal{Z}(\cdot;\Theta_{z1})$$、$$\mathcal{Z}(\cdot;\Theta_{z2})$$。输出变成：
+把网络里的一个模块（例如一组 ResBlock）记作 $$\mathcal{F}(\cdot;\Theta)$$，输入特征 $$x$$，输出 $$y = \mathcal{F}(x;\Theta)$$。ControlNet 对它做三件事：冻结 $$\Theta$$；复制一份参数 $$\Theta_c$$ 作为可训练拷贝；新增两个零卷积 $$\mathcal{Z}(\cdot;\Theta_{z1})$$、$$\mathcal{Z}(\cdot;\Theta_{z2})$$。输出变成 [[1]](#ref-1)：
 
 $$
 y_c = \mathcal{F}(x;\Theta) + \mathcal{Z}\Big(\mathcal{F}\big(x + \mathcal{Z}(c;\Theta_{z1});\ \Theta_c\big);\ \Theta_{z2}\Big)
@@ -183,7 +185,7 @@ $$
 
 ### 2.3 为什么要零初始化
 
-如果最后一层用普通的随机初始化，训练第 0 步拷贝就会输出随机残差，加到 13 个位置上：
+如果最后一层用普通的随机初始化，训练第 0 步拷贝就会输出随机残差，加到 13 个位置上 [[1]](#ref-1)：
 
 $$
 \tilde h_i = h_i + \underbrace{\text{随机噪声}}_{\text{立刻破坏原模型}}
@@ -406,7 +408,7 @@ def sample_controlnet_ddim(model, cond, sched, num_steps=50, control_scale=1.0):
   <figcaption>第一行是条件边缘图，最后一行是原图；中间每行是训练到第 N 步时、用同一个 $$x_T$$、不给类别生成的结果。</figcaption>
 </figure>
 
-几个现象：
+几个现象 [[1]](#ref-1)：
 
 - **第 0 步和第 200 步几乎一模一样**，都等于冻结 base 的无条件生成。这正是零卷积的效果：训练开始时 ControlNet 对输出没有任何影响，base 的生成能力原样保留，不会因为加了一个新分支就先被"打坏"。
 - **400 到 600 步之间突然学会**：鞋、长裤先对上轮廓，之后其余样本陆续跟上。论文里把这叫 *sudden convergence*（SD 上一般在 1 万步以内出现，前面几千步看起来"什么都没学会"，然后某一步突然开始听条件图）。原因是零卷积的权重要先从 0 长到一定大小，残差才开始实质影响输出；在那之前 loss 几乎不动。
@@ -454,7 +456,7 @@ def sample_controlnet_ddim(model, cond, sched, num_steps=50, control_scale=1.0):
 
 ## 5. SD 1.5 上的精确 ControlNet
 
-Tiny 版和 SD 1.5 版只有三处不同：U-Net 是 latent 空间里 4 层的大 U-Net；条件图比 latent 大 8 倍，需要一个会下采样的条件编码器；残差不是 2 个，而是 12 + 1 个。下面的代码直接复用 [Stable Diffusion 篇](/deep-learning/stable-diffusion/) 第 6 节的 `SD15UNet` 和它的各个 block。
+Tiny 版和 SD 1.5 版只有三处不同：U-Net 是 latent 空间里 4 层的大 U-Net；条件图比 latent 大 8 倍，需要一个会下采样的条件编码器；残差不是 2 个，而是 12 + 1 个。下面的代码直接复用 [Stable Diffusion 篇](/deep-learning/stable-diffusion/) 第 6 节的 `SD15UNet` 和它的各个 block。 [[2]](#ref-2)
 
 ### 5.1 条件编码器：把 512×512 的条件图降到 64×64
 
@@ -703,7 +705,7 @@ out = pipe(
 ).images[0]
 ```
 
-多个 ControlNet 时，`controlnet` 传一个列表，`image` 和 `controlnet_conditioning_scale` 也传相同长度的列表，pipeline 内部就是 6.4 节的加权求和。
+多个 ControlNet 时，`controlnet` 传一个列表，`image` 和 `controlnet_conditioning_scale` 也传相同长度的列表，pipeline 内部就是 6.4 节的加权求和。 [[3]](#ref-3)
 
 ### 7.2 训练一步
 
@@ -821,3 +823,9 @@ def segmentation_condition(labels, num_classes, size):
 - **SD 1.5 上多大？** 条件编码器把 512×512 的条件图降到 64×64；12 条 skip + 1 个中间层共 13 个残差；约 3.61 亿参数，是 U-Net 的 42%。
 - **control scale 和 CFG 的区别？** 前者缩放控制残差，管条件图的强度；后者组合有、无文本条件的两次预测，管文本的强度。guess mode 只给有条件分支加残差，并按分辨率加权。
 - **常见的坑？** 先冻结再 `deepcopy` 会让拷贝也被冻结；冻结的 U-Net 前向不能放进 `no_grad`；`model.train()` 会把冻结部分也切到训练模式；条件图不进 VAE，范围是 $$[0, 1]$$；残差的数量、通道、分辨率必须和 base 的 skip 一一对应。
+
+## 参考资料
+
+- <a id="ref-1"></a>**[1] 主论文**：Zhang, Rao, Agrawala. *Adding Conditional Control to Text-to-Image Diffusion Models*. ICCV 2023. [arxiv.org/abs/2302.05543](https://arxiv.org/abs/2302.05543)。可训练拷贝、零卷积、突然收敛、guess mode 都来自这篇。
+- <a id="ref-2"></a>**[2] 官方仓库**：lllyasviel/ControlNet [github.com/lllyasviel/ControlNet](https://github.com/lllyasviel/ControlNet)。各种条件图的预处理器和 SD 1.5 的 ControlNet 权重。
+- <a id="ref-3"></a>**[3] Diffusers 训练文档**：Hugging Face Diffusers: ControlNet training [huggingface.co/docs/diffusers/en/training/controlnet](https://huggingface.co/docs/diffusers/en/training/controlnet)。第 7 节训练和推理代码对应的官方脚本说明。

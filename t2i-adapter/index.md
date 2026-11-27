@@ -30,6 +30,8 @@ T2I-Adapter 问的是：控制信号真的需要这么大的网络吗？它的�
 
 代价是控制精度一般略低于 ControlNet，好处是训练和推理都便宜得多，多个 adapter 还能直接加权相加组合使用。
 
+本文主要参考 T2I-Adapter 原论文 [[1]](#ref-1) 和官方仓库 [[2]](#ref-2)，Diffusers 的用法参考 [[3]](#ref-3)。正文里用 [n] 标出具体出处，完整列表见文末「参考资料」。
+
 ## 0. 全文路线
 
 | 节 | 内容 |
@@ -58,7 +60,7 @@ T2I-Adapter 和 ControlNet 处理的都是第三类：条件图和输出图像�
 
 ### 1.2 出发点：预训练模型其实已经"会"了
 
-论文的观察是：SD 本身已经有很强的结构生成能力，只是文本这个接口没法精确地指定结构。所以要学的不是"怎么画出这个结构"，而是"**怎么把外部的结构信号翻译成 U-Net 内部能听懂的特征**"。这个翻译任务比生成本身简单得多，一个小网络就够了。
+论文的观察是：SD 本身已经有很强的结构生成能力，只是文本这个接口没法精确地指定结构。所以要学的不是"怎么画出这个结构"，而是"**怎么把外部的结构信号翻译成 U-Net 内部能听懂的特征**"。这个翻译任务比生成本身简单得多，一个小网络就够了。 [[1]](#ref-1)
 
 由此得到两个设计：
 
@@ -130,7 +132,7 @@ T2I-Adapter 和 ControlNet 处理的都是第三类：条件图和输出图像�
 
 ### 2.2 公式
 
-记冻结 U-Net 编码器在第 $$i$$ 个尺度上的特征为 $$F_{\text{enc}}^i$$，adapter 是 $$\mathcal{F}_{\text{AD}}$$，条件图是 $$C$$：
+记冻结 U-Net 编码器在第 $$i$$ 个尺度上的特征为 $$F_{\text{enc}}^i$$，adapter 是 $$\mathcal{F}_{\text{AD}}$$，条件图是 $$C$$ [[1]](#ref-1)：
 
 $$
 F_c = \mathcal{F}_{\text{AD}}(C) = \{F_c^1, F_c^2, F_c^3, F_c^4\},\qquad
@@ -187,7 +189,7 @@ $$
 
 ### 2.5 多个 adapter 组合
 
-因为 adapter 的输出只是加在特征上的增量，多个条件（比如草图 + 颜色，或姿态 + 深度）可以直接加权求和：
+因为 adapter 的输出只是加在特征上的增量，多个条件（比如草图 + 颜色，或姿态 + 深度）可以直接加权求和 [[1]](#ref-1)：
 
 $$
 F_c = \sum_{k=1}^{K} \omega_k\, \mathcal{F}_{\text{AD}}^k(C_k)
@@ -203,7 +205,7 @@ $$
 
 ## 3. SD 1.5 上的精确实现
 
-下面是和官方 SD 1.5 完整版 adapter（Diffusers 的 `FullAdapter`）逐层对应的实现。
+下面是和官方 SD 1.5 完整版 adapter（Diffusers 的 `FullAdapter`）逐层对应的实现。 [[2]](#ref-2)
 
 ### 3.1 adapter 本体
 
@@ -350,7 +352,7 @@ with torch.no_grad():
 
 ### 4.2 非均匀的时间步采样
 
-论文分析了一个现象：**生成的结构主要在采样的早期（高噪声阶段）决定**。只在采样的后半段加入 adapter，控制效果很弱；只在前半段加入，结构就基本定了。
+论文分析了一个现象：**生成的结构主要在采样的早期（高噪声阶段）决定**。只在采样的后半段加入 adapter，控制效果很弱；只在前半段加入，结构就基本定了。 [[1]](#ref-1)
 
 但普通训练时 $$t$$ 是从 $$[0, T)$$ 均匀采样的，高噪声的时间步只占一部分。论文改成用三次函数采样，让 $$t$$ 更多地落在大值上：
 
@@ -467,7 +469,7 @@ $$\omega = 0$$ 精确退回 base，$$\omega$$ 越大越贴边缘图，和 Contro
 
 ### 6.1 推理
 
-SDXL 上的 Canny adapter：
+SDXL 上的 Canny adapter [[3]](#ref-3)：
 
 ```python
 import cv2
@@ -595,3 +597,9 @@ def t2i_adapter_training_step(batch, vae, text_encoder, unet, adapter, noise_sch
 - 结构主要在高噪声阶段决定，所以训练用 $$t = (1 - u^3) T$$ 偏向大的时间步；推理时可以只在前一部分步上加 adapter。
 - 多个 adapter 可以直接按权重相加组合，不需要联合训练。
 - Diffusers 里特征走 `down_intrablock_additional_residuals`，不要和 ControlNet 的 `down_block_additional_residuals` 混用。
+
+## 参考资料
+
+- <a id="ref-1"></a>**[1] 主论文**：Mou et al. *T2I-Adapter: Learning Adapters to Dig out More Controllable Ability for Text-to-Image Diffusion Models*. AAAI 2024. [arxiv.org/abs/2302.08453](https://arxiv.org/abs/2302.08453)。结构（论文图 3）、多尺度特征相加、组合控制、三次方时间步采样都来自这篇。
+- <a id="ref-2"></a>**[2] 官方仓库**：TencentARC/T2I-Adapter [github.com/TencentARC/T2I-Adapter](https://github.com/TencentARC/T2I-Adapter)。各种条件的 adapter 权重和训练代码。
+- <a id="ref-3"></a>**[3] Diffusers 文档**：Hugging Face Diffusers: T2I-Adapter [huggingface.co/docs/diffusers/en/using-diffusers/t2i_adapter](https://huggingface.co/docs/diffusers/en/using-diffusers/t2i_adapter)。第 6 节的推理和 `MultiAdapter`。
