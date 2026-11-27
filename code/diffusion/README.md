@@ -2,7 +2,7 @@
 
 这个目录用来从零学习 diffusion，重点是理解 DDPM 的核心公式和代码结构，而不是追求复杂模型或高质量生成结果。
 
-代码解读文章发布在博客：[DDPM 代码解读（一）：数据、噪声调度与前向加噪](https://chaowang15.github.io/deep-learning/ddpm-code-01/)
+代码解读文章发布在博客：[DDPM 从零实现：从公式到代码](https://chaowang15.github.io/deep-learning/ddpm-from-scratch/)
 
 ## 设计：一个阶段一个 notebook
 
@@ -16,10 +16,10 @@
 |---|---|---|---|
 | 00 数据 | `00_check_dataset.ipynb` | `datasets.py` | ✅ 完成 |
 | 01 前向过程 | `01_forward_process.ipynb` | `schedule.py`, `forward_process.py` | ✅ 完成 |
-| 02 噪声预测网络 | `02_noise_prediction.ipynb` | `time_embedding.py`, `unet.py` | ⏳ 下一步 |
-| 03 DDPM 训练 | `03_ddpm_training.ipynb` | `diffusion.py`, `train.py` | ⏳ |
-| 04 采样 | `04_sampling.ipynb` | `sample.py` | ⏳ |
-| 05 DDIM / CFG | `05_ddim_and_cfg.ipynb` | （扩展） | ⏳ |
+| 02 噪声预测网络 | `02_noise_prediction.ipynb` | `time_embedding.py`, `unet.py` | 🟡 `src/` 已实现，notebook 待写 |
+| 03 DDPM 训练 | `03_ddpm_training.ipynb` | `diffusion.py`, `train.py` | 🟡 `src/` 已实现，notebook 待写 |
+| 04 采样 | `04_sampling.ipynb` | `sample.py` | 🟡 `src/` 已实现，notebook 待写 |
+| 05 DDIM / CFG | `05_ddim_and_cfg.ipynb` | `sample.py`（`sample_ddim`）、`unet.py`（`ClassConditionedTinyUNet`） | 🟡 `src/` 已实现，notebook 待写 |
 
 每个 `src/*.py` 第一行的 docstring 都写了它属于哪个阶段、对应哪个 notebook。
 
