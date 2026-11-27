@@ -15,11 +15,11 @@ description: "Notes on seq2seq, attention, Transformer encoder-decoder architect
 
 1. Attention is All you need 原始论文：[https://arxiv.org/pdf/1706.03762.pdf](https://arxiv.org/pdf/1706.03762.pdf)
 2. 视频讲解 attention 机制的基础原理，只针对 Attention，讲的非常细：[Visualizing A Neural Machine Translation Model (Mechanics of Seq2seq Models With Attention)](https://jalammar.github.io/visualizing-neural-machine-translation-mechanics-of-seq2seq-models-with-attention/)
-3. 从RNN开始讲起到Transformer的概述,也引用了上面 [1] 中的视频做成了动图,不过对 Transformer 整体流程 的回顾太简单了：[https://builtin.com/artificial-intelligence/transformer-neural-network](https://builtin.com/artificial-intelligence/transformer-neural-network)
+3. 从RNN开始讲起到Transformer的概述,也引用了上面 [2] 中的视频做成了动图,不过对 Transformer 整体流程 的回顾太简单了：[https://builtin.com/artificial-intelligence/transformer-neural-network](https://builtin.com/artificial-intelligence/transformer-neural-network)
 4. **[推荐]** 这个是很有名的一个给出了从头到尾的**全程 coding** 来讲解 Attention 机制，值得认真学习，适合最先看。只是它只讲述了 attention 并没有整个 Transformer 流程：[Understanding and Coding the Self-Attention Mechanism of Large Language Models From Scratch](https://sebastianraschka.com/blog/2023/self-attention-from-scratch.html)
-5. **[推荐]** 这个教程非常详细给出了整个 Transformer 网络全程的全部细节，每个步骤都有动画，并给出了全程视频，非常指的看，唯一缺点可能是没有代码。**适合最先看**：[*Illustrated Guide to Transformers- Step by Step Explanation](https://towardsdatascience.com/illustrated-guide-to-transformers-step-by-step-explanation-f74876522bc0)。视频：[https://youtu.be/4Bdc55j80l8](https://youtu.be/4Bdc55j80l8)
-6. 大牛 Andrej 对 Transformer 的全程讲解，Stanford 课程，也结合了代码，这个算是终极材料了，将的更深，可以最后看：[CS25 I Stanford Seminar - Transformers United 2023: Introduction to Transformers w/ Andrej Karpathy](https://www.youtube.com/watch?v=XfpMkf4rD6E)
-7. **[强烈推荐]** 这个是 Transformer **原作者给出的官方代码**，超级推荐，代码可用并且 step by step 非常细。只是没有讲解过程，因此**适合最后代码实战时候看**： [The Annotated Transformer](http://nlp.seas.harvard.edu/annotated-transformer/)
+5. **[推荐]** 这个教程非常详细给出了整个 Transformer 网络全程的全部细节，每个步骤都有动画，并给出了全程视频，非常值得看，唯一缺点可能是没有代码。**适合最先看**：[*Illustrated Guide to Transformers- Step by Step Explanation](https://towardsdatascience.com/illustrated-guide-to-transformers-step-by-step-explanation-f74876522bc0)。视频：[https://youtu.be/4Bdc55j80l8](https://youtu.be/4Bdc55j80l8)
+6. 大牛 Andrej 对 Transformer 的全程讲解，Stanford 课程，也结合了代码，这个算是终极材料了，讲得更深，可以最后看：[CS25 I Stanford Seminar - Transformers United 2023: Introduction to Transformers w/ Andrej Karpathy](https://www.youtube.com/watch?v=XfpMkf4rD6E)
+7. **[强烈推荐]** 这个是 Harvard NLP 组（Sasha Rush 等）按论文逐段实现的 PyTorch 代码（注意：不是原论文作者本人的代码，原作者的官方实现在 Google 的 tensor2tensor 里；不过这份是公认最好的逐行对照版本，本文所说的"官方实现"都指它），超级推荐，代码可用并且 step by step 非常细。只是没有讲解过程，因此**适合最后代码实战时候看**： [The Annotated Transformer](http://nlp.seas.harvard.edu/annotated-transformer/)
 8. 非常好的有全程图例的 Transformer 回顾，全程没有公式，而是用各种图例展示流程。不过因为流程介绍不够详细，因此适合同其他材料一起看，而不是单独看： [The Illustrated Transformer](http://jalammar.github.io/illustrated-transformer/)
 
 ## 1. 以 RNN 为代表的 Seq2Seq 模型回顾
@@ -30,7 +30,7 @@ description: "Notes on seq2seq, attention, Transformer encoder-decoder architect
 
 Ref [1] 即 Transformer 原始论文中的一段评价：
 
-> Recurrent models typically factor computation along the symbol positions of the input and output sequences. Aligning the positions to steps in computation time, they generate a sequence of hidden states ht, as a function of the previous hidden state $h_t−1$ and the input for position $t$.
+> Recurrent models typically factor computation along the symbol positions of the input and output sequences. Aligning the positions to steps in computation time, they generate a sequence of hidden states $h_t$, as a function of the previous hidden state $h_{t-1}$ and the input for position $t$.
 > 
 
 接下来我们再一次先回顾 RNN 以及 LSTM 这种 recurrent network 框架的基本架构，然后引出 Attention 机制。
@@ -71,7 +71,7 @@ Ref [1] 即 Transformer 原始论文中的一段评价：
 
 ![image.png](/deep-learning/assets/transformer-study/image%201.png)
 
-这里参考 Ref. [5]给出的一个简单的代码，将一个6个单词输入的句子中的每个 word index 映射到 embedding vector 上。
+这里参考 Ref. [4] 给出的一个简单的代码，将一个6个单词输入的句子中的每个 word index 映射到 embedding vector 上。
 
 ```python
 import torch
@@ -100,7 +100,7 @@ Okay 现在就可以总结回顾一下 RNN 模型的流程了（LSTM本质上和
 
 RNN也分为单层和多层，这里首先以单层 single layer 为例。
 
-RNN 中定义了 hidden state，长度就是 Hidden units 的长度。在RNN网络结构中，每个 hidden unit 就只有一个一维的 weight vector 和另一个平移向量即 $\mathbf{w}_i$ 组成，它们的长度就和输入的每一个 word embedding vector $\mathbf{v}_t$ 长度相等，而做的事情就类似这样的点乘再求和：
+RNN 中定义了 hidden state，长度就是 Hidden units 的长度。先只看当前输入：每个 hidden unit $$i$$ 有一个一维的 weight vector $$\mathbf{w}_i$$，它的长度和输入的每一个 word embedding vector $$\mathbf{v}_t$$ 长度相等，再加一个标量 bias $$b_i$$，做的事情就类似这样的点乘再求和：
 
 $$
 h_{it} = \mathbf{w}_i\mathbf{v}_t +b_i
@@ -123,13 +123,20 @@ $$
 \mathbf{h}_t = (h_{1t}, h_{2t}, \ldots, h_{Dt})
 $$
 
-通常 RNN 还会考虑到上一步的 hidden state，因此刚刚这个计算会纠正为这样：
+通常 RNN 还会考虑到上一步的 hidden state，并且最后要过一个非线性激活（标准 RNN 用 tanh），因此刚刚这个计算会纠正为这样：
 
 $$
-h_{it}=\mathbf{w}_i \mathbf{v}_t + \mathbf{h}_{t-1}\mathbf{b}_i
+h_{it}=\tanh\big(\mathbf{w}_i \mathbf{v}_t + \mathbf{u}_i \mathbf{h}_{t-1} + b_i\big)
 $$
 
-$\mathbf{h}_{t-1}$ 就是上一步的 hidden state 结果， $\mathbf{b}_i$ 则是bias，注意此时它们就都是一个向量了，长度就是#hidden units。
+$$\mathbf{h}_{t-1}$$ 就是上一步的 hidden state 结果，$$\mathbf{u}_i$$ 是第 $$i$$ 个 hidden unit 用来"看"上一步 hidden state 的循环权重（recurrent weight），它是一个向量，长度就是 #hidden units；$$b_i$$ 是标量 bias。把全部 hidden units 写成矩阵形式就是常见的 $$\mathbf{h}_t = \tanh(W_{xh}\mathbf{v}_t + W_{hh}\mathbf{h}_{t-1} + \mathbf{b})$$。
+
+<div class="note-callout">
+❗
+
+<strong>注</strong>：下面我画的示意图里写的 $b_i$ 指的就是这里的循环权重 $\mathbf{u}_i$（不是 bias），并且为了简洁省略了 bias 和 tanh。
+
+</div>
 
 可以看出，对于**每个 time step的计算中，使用的都是同一批即全部的 hidden unites 中的** $\mathbf{w,b}$ **一起运算**，而不是每次的输入都有新的。最终，重复了 $T$ 次（即**单词总个数**）计算后，得到了最终的 hidden state 结果，而这个**最后一个 time step 就是我们上面所称的 context vector** 了，可以看出它的长度是和 hidden units 相等的。
 
@@ -137,12 +144,12 @@ $\mathbf{h}_{t-1}$ 就是上一步的 hidden state 结果， $\mathbf{b}_i$ 则�
 
 ![image.png](/deep-learning/assets/transformer-study/image%202.png)
 
-不难看出，这个 RNN 模块中的参数就是 #(hidden units) x $D$ x 2（即全部的 w, b 的参数量），其中 $D$ 是输入的 embedding vector 的长度。
+不难看出，记输入 embedding vector 的长度为 $$E$$，这个 RNN 模块中的参数就是 $$D \times E$$（全部 $$\mathbf{w}_i$$）$$+ D \times D$$（全部 $$\mathbf{u}_i$$）$$+ D$$（全部 $$b_i$$），其中 $$D$$ 是 #hidden units。（PyTorch 的 `nn.RNN` 给两部分各配了一个 bias，所以是 $$D \times E + D \times D + 2D$$。）
 
 另外，通常在 pytorch 等代码实现中，类似的 RNN 结构通常会同时返回：
 
-1. 每一个 time step 得到的全部 hidden states 结果，即全部 $T$ 个单词的 $\mathbf{h}_0, \mathbf{h}_1, \ldots, \mathbf{h}_t$
-2. 最后一个 time step t 的 hidden state $\mathbf{h}_t$（即 context vector）。
+1. 每一个 time step 得到的全部 hidden states 结果，即全部 $T$ 个单词的 $\mathbf{h}_1, \mathbf{h}_2, \ldots, \mathbf{h}_T$
+2. 最后一个 time step $T$ 的 hidden state $\mathbf{h}_T$（即 context vector）。
 
 #### 1.4.2 多层RNN结构
 
@@ -217,11 +224,11 @@ Let us now bring the whole thing together in the following visualization and loo
 
 视频中以 time step 4 即 Decoder 第一步（其实就是 Encoder 结束后，因为输入单词就3个）为例：
 
-1. Decoder RNN 的输入有两个：1) 全部的 Encoder 的 hidden states；2) Decoder RNN 的上一步的 hidden states。因为这是 Decoder 第一步，因此这里用的是代表了 `<END>` 这个单词的 embedding vector。
+1. Decoder RNN 这一步的输入有两个：1) 上一步输出的单词的 embedding，因为这是 Decoder 第一步，这里用的是代表 `<END>` 这个单词的 embedding vector；2) Decoder RNN 上一步的 hidden state（第一步就用初始的 decoder hidden state）。全部的 Encoder hidden states 不进 RNN，而是在第 3 步打分时用到。
 2. 接着就是常规的 RNN 流程。得到 Decoder Hidden States output vector $\mathbf{h}_i$;
 3. 额外处理：对每个输入的 hidden state 打分（打分流程其实也是加上了新的权重，然后训练学习得到的，之后会说明）。打分是基于 softmax 平衡分数，使得最终 scores 在0-1之间。
 4. 打分后，对每个score乘以对应的 hidden vector，再相加得到最终的 attention context vector。
-5. 之后，将这个 attention context vector 和 Decoder RNN 返回的 hidden states 链接到一起，组成更长的向量，作为一个新的网络 feedforward neural network 的输入，然后输出就是最终的这一个 step 的 hidden states vector 了。
+5. 之后，将这个 attention context vector 和 Decoder RNN 返回的 hidden state 拼接到一起，组成更长的向量，作为一个新的 feedforward neural network 的输入，它的输出就是这一个 step 预测的单词（在整个 vocabulary 上的分布）。
 
 下面是这个流程的具体例子，用不同颜色深浅度代表 score 大小，很好显示单词之间的关联度。
 
@@ -328,11 +335,11 @@ class Embeddings(nn.Module):
 
 ![image.png](/deep-learning/assets/transformer-study/image%2011.png)
 
-其中 $pos$ 是 position index，即前面的 step 值，即每个单词传入顺序的 index ，范围就是 $[0,T-1]$， $T$ is max length of all sentences。而 $i$ 是在 embedding dimension 中的 index 位置，它的范围是 $[0,D-1]$，而D是 embedding dimension size，即图中的 $d_{model}$
+其中 $pos$ 是 position index，即前面的 step 值，即每个单词传入顺序的 index ，范围就是 $[0,T-1]$， $T$ is max length of all sentences。而 $2i$ 和 $2i+1$ 是在 embedding dimension 中的 index 位置，所以 $i$ 的范围是 $[0, D/2-1]$，而 D 是 embedding dimension size，即图中的 $d_{model}$
 
 上面公式是针对奇数和偶数的 embedding index 位置交替使用 sin/cos 函数计算。不难看出，最终每个单词的 Positional Embedding 结果也是长度 $D$ 的向量，因此可以和原始的 vector embedding X 相加，得到最终的 Positional Embedding Vector。即结果：X = X + PE。它会作为后面的整个 Encoder Layer 的输入。
 
-指的注意的是，Positional Embedding 这个计算流程**是独立于 X 存在的**（即它并非X的函数），它**不包含待训练的参数**（代码中可以用 `requires_grad_(False)` 标明）
+值得注意的是，Positional Embedding 这个计算流程**是独立于 X 存在的**（即它并非X的函数），它**不包含待训练的参数**（代码中可以用 `requires_grad_(False)` 标明）
 
 **官方实现**
 
@@ -350,7 +357,7 @@ class PositionalEncoding(nn.Module):
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len).unsqueeze(1)
         # 注意这里只计算偶数位置，对应就是公式中的2i。
-        # 另外这里用了exp(i*log10000)=pow(10000,i)来计算后者
+        # 另外这里用了 exp(-2i*ln(10000)/d_model) = 1/10000^(2i/d_model) 来计算公式里的分母（log 是自然对数）
         div_term = torch.exp(
             torch.arange(0, d_model, 2) * -(math.log(10000.0) / d_model)
         )
@@ -362,7 +369,7 @@ class PositionalEncoding(nn.Module):
 
     def forward(self, x):
         # x: (b,T,d_model), pe: (1,max_len,d_model)
-        # T通常是这个batch中的所有sentences的max length（其实经常它就等于max_len）
+        # T通常是这个batch中的所有sentences的max length
         # max_len则通常是整个数据集全部sentences的max length，所以max_len>=T
         # 因此下面两者可以相加
         x = x + self.pe[:, : x.size(1)].requires_grad_(False)
@@ -372,7 +379,7 @@ class PositionalEncoding(nn.Module):
 
 **NOTE for this code：**
 
-- 它使用了 exp 和 log 结合的方式来公式中的 power(10000, 2i) 运算。
+- 它使用了 exp 和 log 结合的方式来计算公式中的 $10000^{2i/d_{model}}$（先算 $-2i \ln 10000 / d_{model}$ 再取 exp，得到的是它的倒数，数值上更稳定）。
 - 注意公式中的 2i 和 2i+1 只是为了区分奇数和偶数位置。实现中，2i会作为整体传入，而它显然就是个偶数。因此 div_term 中只实现了偶数位置的计算，而在下面一行的 pe 计算时，分成 sin/cos 计算并放在 pe 中的对应的奇数和偶数的位置。
 - 注意，Positional Embedding 的实现是无需参与训练的，因此要设置为 requires_grad_(False)
 
@@ -400,7 +407,7 @@ Self attention模块的输入 **x** 是 embeded vector array，图中记为 $n \
 
 #### 1) 通过 Linear Layers 计算 Q, K, V
 
-首先 Encoder Layer 会将输入的 Positional Embedding Vectors 传入三个 Linear Layers，分别是 Query, Key,  Value层，得到三个数组 **Q,K,V**。从图中不难看出，**Q,K** 的 embedding 维度是相同的，即 $d_q=d_k$ ，而 **V** 的 embedding 维度是 $d_v$ 可以不同。在 **Self Attention** 中，这三个量全都相同，例如一个常见的例子 $d_q=d_k=d_v=64$ 。而在 **Cross Attention** 中则两者会不同（后面讲）。
+首先 Encoder Layer 会将输入的 Positional Embedding Vectors 传入三个 Linear Layers，分别是 Query, Key,  Value层，得到三个数组 **Q,K,V**。从图中不难看出，**Q,K** 的 embedding 维度是相同的，即 $d_q=d_k$ ，而 **V** 的 embedding 维度是 $d_v$ 可以不同。实际实现中这三个维度通常都相同，例如多头注意力里一个常见的例子 $d_q=d_k=d_v=64$ 。**Self Attention** 和 **Cross Attention** 的区别不在维度，而在于 Q 和 K、V 来自哪里：前者三者都来自同一个输入，后者 Q 来自 Decoder、K 和 V 来自 Encoder 的输出（后面讲），所以 Q 和 K 的**token 个数**可以不同。
 
 #### 2) Q and K 点乘得到 Scores 数组
 
@@ -410,7 +417,7 @@ $$
  Scores=QK^T
 $$
 
-Scores数组代表了每个输入向量（即单词）和其他单词之间的关系程度（比如数值越大代表关系越紧密），也代表了模型会尽量 focus 到那些单词上。它是 $n\times d$ 的方阵。其中每一行 ith row 就代表了 ith word 和其他所有 words 之间的 attention scores，即关系的紧密程度等。
+Scores数组代表了每个输入向量（即单词）和其他单词之间的关系程度（比如数值越大代表关系越紧密），也代表了模型会尽量 focus 到那些单词上。它是 $n\times n$ 的方阵。其中每一行 ith row 就代表了 ith word 和其他所有 words 之间的 attention scores，即关系的紧密程度等。
 
 这里是一个 $d_q=d_k=d_v=3$ 的例子（注意下图左边Q和K的维度颠倒了，应该是Q是4x3，K是3x4才对）。右图是一个scores的例子，可以表明单词之间的相关性。
 
@@ -418,7 +425,7 @@ Scores数组代表了每个输入向量（即单词）和其他单词之间的�
 
 #### 3) 修改尺度 **Scaling Down Attention Scores**
 
-这里就是简单将 Score matrix 除以 $\sqrt{d_k}$ ，目的是将 scores 结果尽量分布到scale相差不太大，方便更加稳定的计算导数，避免数值过大导致gradient exploding（因为矩阵相乘容易使得数值过大）。
+这里就是简单将 Score matrix 除以 $\sqrt{d_k}$ 。原因是：如果 q、k 的每一维是均值 0、方差 1 的独立变量，它们点乘的结果方差是 $d_k$，$d_k$ 越大数值越大。数值很大时 softmax 会非常"尖"，几乎变成 one-hot，这时 softmax 的梯度非常小（vanishing gradient），训练很难进行。除以 $\sqrt{d_k}$ 正好把方差拉回 1（原论文 3.2.1 节的解释）。
 
 ![image.png](/deep-learning/assets/transformer-study/image%2017.png)
 
@@ -426,15 +433,15 @@ Attention Scores 数组的含义其实就是每个 token 和其他 tokens 的关
 
 #### 4) 使用 Mask 屏蔽 Invalid Tokens (Optional but common)
 
-前面得到的 Attention Scores 数组的含义其实就是每个 token 和其他 tokens 的关联度打分。不过，数据中经常会存在 invalid tokens，例如那些不在 vocabulary 中的 words，又或者是句子末尾补上的 pad 0。后者的原因是，我们的训练数据比如句子的 words 个数即每个句子长度显然很可能不同，而训练中的Batch则必须是一个固定大小的数组，例如 (batch_size, seq_len)，其中 seq_len 是一个对于当前batch的固定值，通常设定成当前batch中全部句子的最大长度（有时也会设置成一个全局的整个数据集的全部句子的最大长度）。因此，不难看出，batch中会有很多句子会提前结束。那么**句子结束到 seq_len 这一段**如何处理？通常我们的做法是给这一段**pad一个默认的invalid index，例如 pad 0**，并把 id=0 认为是一个 invalid token（而如果一个word不在dictionary中，也被认为是invalid token而赋予id=0）。这样的话，在计算 scores 数组时，我们要排除掉这些 invalid token 和其他 tokens之间的关联，即将scores中的这些 invalid tokens 所对应的都设成0，即将这些位置mask掉。
+前面得到的 Attention Scores 数组的含义其实就是每个 token 和其他 tokens 的关联度打分。不过，数据中经常会存在 invalid tokens，例如那些不在 vocabulary 中的 words，又或者是句子末尾补上的 pad 0。后者的原因是，我们的训练数据比如句子的 words 个数即每个句子长度显然很可能不同，而训练中的Batch则必须是一个固定大小的数组，例如 (batch_size, seq_len)，其中 seq_len 是一个对于当前batch的固定值，通常设定成当前batch中全部句子的最大长度（有时也会设置成一个全局的整个数据集的全部句子的最大长度）。因此，不难看出，batch中会有很多句子会提前结束。那么**句子结束到 seq_len 这一段**如何处理？通常我们的做法是给这一段**pad一个默认的invalid index，例如 pad 0**，并把 id=0 认为是一个 invalid token（而如果一个word不在dictionary中，也被认为是invalid token而赋予id=0）。这样的话，在计算 scores 数组时，我们要排除掉这些 invalid token 和其他 tokens之间的关联，即将这些位置 mask 掉，使得 softmax 之后它们的权重是 0（具体怎么做见下面，不是直接把 scores 设成 0）。
 
 ![image.png](/deep-learning/assets/transformer-study/image%2018.png)
 
-这个实现就比较直观了，我们只需要设计一个针对 words ID 的一个binary mask，将那些 ID=0 的位置标记出来为0，剩下的是1即可。例如，如果 word ID 数组是 src is (batch, seq_len），保存的是batch每个句子每个单词对应的 word integer ID，创建它的时候已经做了 pad 0 操作在每个句子末尾。因此，它对应的 mask 就是 `src_mask = (src != pad)` ，where pad=0，很简单。而为了后续使用，还要接着用 unsqueeze(2) 操作变成 (batch_size, 1, seq_len)，这样就可以作用到 scores 数组上。
+这个实现就比较直观了，我们只需要设计一个针对 words ID 的一个binary mask，将那些 ID=0 的位置标记出来为0，剩下的是1即可。例如，如果 word ID 数组是 src is (batch, seq_len），保存的是batch每个句子每个单词对应的 word integer ID，创建它的时候已经做了 pad 0 操作在每个句子末尾。因此，它对应的 mask 就是 `src_mask = (src != pad)` ，where pad=0，很简单。而为了后续使用，还要接着用 unsqueeze(-2)（即 unsqueeze(1)）操作变成 (batch_size, 1, seq_len)，这样就可以作用到 scores 数组上。
 
-scores数组是 (batch, seq_len, seq_len)。方法可以使用 `scores **=** scores.masked_fill(src_mask **==** 0, **-**1e9)`。这里 `masked_fill()` 支持 broadcasting，它会将 mask (batch_size, 1, seq_len) 先变成 (batch_size, seq_len, seq_len) 然后再将scores中对应的masks是0的位置设置为一个极小值 -inf。之所以不是0，是因为，接下来我们要用 Softmax(Scores）来将 scores 转成 [0,1] 之间的类似概率的值。而 Softmax 计算公式是 `e^x/sum(e^x)`，只有`e^(-inf)=0`才成立。因此要设成极小值才行。
+scores数组是 (batch, seq_len, seq_len)。方法可以使用 `scores = scores.masked_fill(src_mask == 0, -1e9)`。这里 `masked_fill()` 支持 broadcasting，它会将 mask (batch_size, 1, seq_len) 先变成 (batch_size, seq_len, seq_len) 然后再将scores中对应的masks是0的位置设置为一个极小值 -inf。之所以不是0，是因为，接下来我们要用 Softmax(Scores）来将 scores 转成 [0,1] 之间的类似概率的值。而 Softmax 计算公式是 `e^x/sum(e^x)`，只有`e^(-inf)=0`才成立。因此要设成极小值才行。
 
-**不过，在 Encoder 和 Decoder 中使用的 mask 不同，**这是因为 Encoder 的输入通常是整个数据集，即我们能见到过去和未来全部信息，因此这时的 mask 就是如上面所示。而 Decoder 则不同，它通常是每次只能预测未来一个单词，因此对于当前的单词，它没法知道未来信息。因此这时的 mask 的设计需要屏蔽掉未来单词的影响。具体参见后面 Decoder 中的介绍。
+**不过，在 Encoder 和 Decoder 中使用的 mask 不同，**这是因为 Encoder 的输入是整个输入句子，每个单词都可以看到句子里过去和未来的全部单词，因此这时的 mask 只需要屏蔽 pad，如上面所示。而 Decoder 则不同，它是逐个预测单词的，预测当前单词时不能用到未来的单词（训练时虽然整句一起送进去，也要用 mask 把未来的单词挡住）。因此这时的 mask 的设计需要屏蔽掉未来单词的影响。具体参见后面 Decoder 中的介绍。
 
 #### 5) 使用 Softmax 平衡 Softmax of Scaled Scores
 
@@ -483,7 +490,7 @@ $$
 
 #### 官方实现
 
-具体在 Ref [6] 的 Encoder Decoder 介绍中： [https://nlp.seas.harvard.edu/annotated-transformer/#encoder-and-decoder-stacks](https://nlp.seas.harvard.edu/annotated-transformer/#encoder-and-decoder-stacks)
+具体在 Ref [7] 的 Encoder Decoder 介绍中： [https://nlp.seas.harvard.edu/annotated-transformer/#encoder-and-decoder-stacks](https://nlp.seas.harvard.edu/annotated-transformer/#encoder-and-decoder-stacks)
 
 另一个 pytorch 中的官方实现：[https://docs.pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html](https://docs.pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html)
 
@@ -500,11 +507,10 @@ def attention(query, key, value, mask=None, dropout=None):
     # batch multiplication，即只针对每个batch的最后两个维度做乘法，保留前面的维度. 
     scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
 
-    # mask在后面 Decoder中的attention才会用到，目的是消除和未来单词之间的关联，因为在
-    # Decoder中，单词是逐个预测的，而不是像Encoder这样把整个句子全部单词全扔进去训练。
-    # 由于scores含义就是每个单词和其他单词之间的关联程度，因此显然单词不能和未来单词相关联，
-    # 于是要用mask（通常是一个下三角数组）将上三角部分给清掉。这里用了-1e9一个很大的负数，是为了
-    # 使得计算 softmwax 后这个值变成0.
+    # mask 有两种：Encoder 里的 src_mask 只屏蔽 pad；Decoder self-attention 里的 tgt_mask
+    # 还要屏蔽未来单词，因为 Decoder 是逐个预测单词的，单词不能和未来单词相关联，
+    # 于是要用一个下三角的 mask 将上三角部分给清掉。这里用了-1e9一个很大的负数，是为了
+    # 使得计算 softmax 后这个值变成0.
     if mask is not None:
         scores = scores.masked_fill(mask == 0, -1e9)
     # softmax针对最后一个维度
@@ -547,18 +553,19 @@ class MultiHeadedAttention(nn.Module):
 
     def forward(self, query, key, value, mask=None):
         # 通常输入的Q,K,V还是三个维度 (batch_size, seq_len, d_model)
-        if maskisnotNone:
-            # mask: (batch_size, 1, seq_len, seq_len), for h heads
-            mask= mask.unsqueeze(1)
-        batch_size= query.size(0)
+        if mask is not None:
+            # 增加 head 维度: (b, 1, seq_len) -> (b, 1, 1, seq_len), 或 (b, n, n) -> (b, 1, n, n)
+            mask = mask.unsqueeze(1)
+        batch_size = query.size(0)
 
         # 对Q,K,V都经过对应的Linear层。下面是一个简洁写法。
         # (batch_size, seq_len, d_model) -> (batch_size, seq_len, h, d_k)
-        #NOTE: 1) these two lines are equivalent to the following commented lines for each of query, key, value:
+        # NOTE: 1) these two lines are equivalent to the following commented lines for each of query, key, value:
         # 2) the zip(A,B) operation can align the length of A and B by taking the minimum length of the two, and
         #   here A,B could be either list or tuples.
-        query, key, value= [
-            lin(x).view(batch_size,-1,self.h,self.d_k).transpose(1, 2) for lin, xin zip(self.linears, (query, key, value))
+        query, key, value = [
+            lin(x).view(batch_size, -1, self.h, self.d_k).transpose(1, 2)
+            for lin, x in zip(self.linears, (query, key, value))
         ]
         """
         # 上面的简单写法展开后如下所示，下面是以Query为例，K,V类似。
@@ -573,7 +580,7 @@ class MultiHeadedAttention(nn.Module):
 
         # 直接调用attention()方法，里面已经设计好，可以处理多头机制
         # x: (batch_size, h, seq_len, d_k), attn: (batch_size, h, seq_len, seq_len)
-        x,self.attn= attention(query, key, value, mask=mask, dropout=self.dropout)
+        x, self.attn = attention(query, key, value, mask=mask, dropout=self.dropout)
 
         # 合并全部heads的结果，然后恢复 (batch_size, seq_len, d_model) 的形式
         # concat results of all heads together and merge the two dimensions.
@@ -585,14 +592,14 @@ class MultiHeadedAttention(nn.Module):
         #   view() function MUST take a continuous tensor to reshape).
         # 3) view(batch_size, -1, self.h * self.d_k): Reshapes the tensor to [batch_size, seq_len, d_model] where d_model = h * d_k
         #    The -1 automatically calculates the seq_len dimension based on the total number of elements
-        x= x.transpose(1, 2).contiguous().view(batch_size,-1,self.h*self.d_k)
+        x = x.transpose(1, 2).contiguous().view(batch_size, -1, self.h * self.d_k)
 
         # It might be not that necessary to release memory here, but just to be safe that they won't be used anywhere else after this.
-				del query, key, value
+        del query, key, value
 
         # 最后经过Linear层
         # Remember to run the last linear layer. (batch_size, seq_len, d_model) -> (batch_size, seq_len, d_model)
-				return self.linear[-1](x)
+        return self.linears[-1](x)
 
 ```
 
@@ -620,7 +627,7 @@ LayerNorm Ref: [https://docs.pytorch.org/docs/stable/generated/torch.nn.LayerNor
 
 #### 3) Position-wise Feed-Forward Networks
 
-针对上一步的 Layer Norm 的结果，引入这个 Position-wise Feed-Forward Module（有时也被称为 Point-wise）。它只包含两个Linear Layers以及中间的一个 ReLU 层。并且注意，这个结束后，在最后还会**再次引入一个 residule connection**。
+针对上一步的 Layer Norm 的结果，引入这个 Position-wise Feed-Forward Module（有时也被称为 Point-wise）。它只包含两个Linear Layers以及中间的一个 ReLU 层。并且注意，这个结束后，在最后还会**再次引入一个 residual connection**。
 
 ![image.png](/deep-learning/assets/transformer-study/image%2024.png)
 
@@ -640,6 +647,13 @@ X &= LayerNorm(X)
 $$
 
 不难看出，这里 Residual Connection 和 LayerNorm 都用了两次。
+
+<div class="note-callout">
+❗
+
+<strong>注：论文和官方代码的 LayerNorm 位置不一样。</strong>上面的公式是原论文的写法，先残差相加再 LayerNorm，即 $X = \text{LayerNorm}(X + \text{Sublayer}(X))$，称为 Post-LN。而下面官方代码里的 `SublayerConnection` 写的是 `x + dropout(sublayer(norm(x)))`，即先对子层的输入做 LayerNorm，再残差相加：$X = X + \text{Sublayer}(\text{LayerNorm}(X))$，称为 Pre-LN。Pre-LN 训练更稳定，后来的 GPT 等模型基本都用它；代价是残差相加后的结果没有被归一化，所以 Encoder 和 Decoder 的最后都要再补一层 LayerNorm（3.7.3 节代码里的 `self.norm`）。
+
+</div>
 
 #### 官方实现
 
@@ -663,7 +677,7 @@ class SublayerConnection(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, sublayer):
-        # 这里定义了LayerNorm以及Add Residual的重复操作，并且输入sublayer，它可以
+        # 这里定义了LayerNorm以及Add Residual的重复操作（注意是 Pre-LN：先 norm 再进 sublayer，见上面的注），并且输入sublayer，它可以
         # 是Multi-Headed Attention，也可以是 Feed Forward，这样就避免重复实现，使代码简洁
         return x + self.dropout(sublayer(self.norm(x)))
 
@@ -683,7 +697,7 @@ class PositionwiseFeedForward(nn.Module):
 
 # 调用就很方便了
 ...
-self.sublayers = Clones(SublayerConnection(size, dropout), 2)
+self.sublayer = clones(SublayerConnection(size, dropout), 2)
 x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask)) # Multi-Headed attention 
 x = self.sublayer[1](x, self.feed_forward) # Feed Forward
 
@@ -693,8 +707,8 @@ x = self.sublayer[1](x, self.feed_forward) # Feed Forward
 
 参考：
 
-- 具体在 Ref [6] 的 Encoder Decoder 介绍中: [https://nlp.seas.harvard.edu/annotated-transformer/#encoder-and-decoder-stacks](https://nlp.seas.harvard.edu/annotated-transformer/#encoder-and-decoder-stacks)  这里就是把前面几个章节的全部代码放一起了
-- 第三方实现的一个简单的 Transformer 代码，基本上就是基于官方代码 Ref [6] ，并且增加了更多的图例: [https://github.com/cuicaihao/Annotated-Transformer-English-to-Chinese-Translator/blob/master/Annotated_Transformer_English_to_Chinese_Translator.ipynb](https://github.com/cuicaihao/Annotated-Transformer-English-to-Chinese-Translator/blob/master/Annotated_Transformer_English_to_Chinese_Translator.ipynb)
+- 具体在 Ref [7] 的 Encoder Decoder 介绍中: [https://nlp.seas.harvard.edu/annotated-transformer/#encoder-and-decoder-stacks](https://nlp.seas.harvard.edu/annotated-transformer/#encoder-and-decoder-stacks)  这里就是把前面几个章节的全部代码放一起了
+- 第三方实现的一个简单的 Transformer 代码，基本上就是基于官方代码 Ref [7] ，并且增加了更多的图例: [https://github.com/cuicaihao/Annotated-Transformer-English-to-Chinese-Translator/blob/master/Annotated_Transformer_English_to_Chinese_Translator.ipynb](https://github.com/cuicaihao/Annotated-Transformer-English-to-Chinese-Translator/blob/master/Annotated_Transformer_English_to_Chinese_Translator.ipynb)
 
 前面已经讲述了 Encoder 的全部基础模块了。从流程图可以看出，整个 Encoder 包括 N 个 EncoderLayer，每个 EncoderLayer 包括前面讲述的那些基础模块。
 
@@ -858,7 +872,7 @@ class PositionwiseFeedForward(nn.Module):
         return self.w_2(self.dropout(self.w_1(x).relu()))
 ```
 
-#### 3.7.2 EncoderLayer 模块以及最终的 Encoder Class
+#### 3.7.3 EncoderLayer 模块以及最终的 Encoder Class
 
 每个 Encoder Instance 中包含 N 个相同的 EncoderLayer.
 
@@ -873,7 +887,7 @@ class EncoderLayer(nn.Module):
 
     def __init__(self, size, self_attn, feed_forward, dropout):
         # size: embedding size, 通常等于 d_model, self_attn 和 feed_forward 要提前定义好, dropout: dropout ratio
-        # 这里的 size 只用来传入 Encoder 中用于其 LayerNorm 的定义, 而 EncoderLayer 中则不用
+        # size 在 EncoderLayer 里用于 SublayerConnection 中 LayerNorm 的定义, 另外 Encoder 也会读取 layer.size 定义最后的 LayerNorm
         super(EncoderLayer, self).__init__()
         self.size = size
         self.self_attn = self_attn
@@ -910,8 +924,9 @@ class Encoder(nn.Module):
         for layer in self.layers:
             x = layer(x, mask)
 
-        # 注意整个 Encoder 结束后, 官方代码又加上了一层 Layer Norm, 不过流程图上并没有。或许是考虑到
-        # 接下来 Encoder 的输出会被传入到 Decoder Attention 作为输入, 因此加上 LayerNorm 使输出更稳定
+        # 注意整个 Encoder 结束后, 官方代码又加上了一层 Layer Norm, 流程图上并没有。原因是这份代码用的是
+        # Pre-LN 写法 (见 3.6 节的说明): 每个子层只对输入做 LayerNorm, 残差相加后的结果没有归一化,
+        # 所以最后要补一层 LayerNorm, 让送进 Decoder 的输出是归一化过的
         return self.norm(x)
 ```
 
@@ -932,14 +947,14 @@ def make_model(src_vocab, tgt_vocab, N=6, d_model=512, d_ff=2048, h=8, dropout=0
         dropout: dropout ratio
     """
     c = copy.deepcopy
-    **attn = MultiHeadedAttention(h, d_model)
+    attn = MultiHeadedAttention(h, d_model)
     ff = PositionwiseFeedForward(d_model, d_ff, dropout)
-    pos_embed = PositionalEncoding(d_model, dropout)**
+    pos_embed = PositionalEncoding(d_model, dropout)
 
-    **encoder = Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout), N)**
+    encoder = Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout), N)
     decoder = Decoder(DecoderLayer(d_model, c(attn), c(attn), c(ff), dropout), N)
-    src_embed = nn.Sequential(Embeddings(src_vocab, d_model), pos_embed)
-    tgt_embed = nn.Sequential(Embeddings(tgt_vocab, d_model), pos_embed)
+    src_embed = nn.Sequential(Embeddings(d_model, src_vocab), pos_embed)
+    tgt_embed = nn.Sequential(Embeddings(d_model, tgt_vocab), pos_embed)
     generator = Generator(d_model, tgt_vocab)
 
     model = Transformer(encoder, decoder, src_embed, tgt_embed, generator)
@@ -956,7 +971,7 @@ def make_model(src_vocab, tgt_vocab, N=6, d_model=512, d_ff=2048, h=8, dropout=0
 
 ### 3.8 Decoder 全流程
 
-整个 Decorder 流程如下图。
+整个 Decoder 流程如下图。
 
 ![image.png](/deep-learning/assets/transformer-study/image%2027.png)
 
@@ -964,7 +979,7 @@ Decoder流程的特点是：
 
 - 和Encoder类似的，Decoder的核心模块也是 Multi-Headed Attention，只是它会用多个 Attention Modules来增大网络；
 - 和Encoder不同的，Decoder中间的Multi-Headed Attention模块同时引入Encoder的输出结果和Decoder前面的Output的Decode结果，用于建立 Input 和 Output 之间的关联。
-- 另一点和 Encoder 不同的是，**Decoder 需要 word-by-word prediction来预测下一个 token**，因此它不能有 Output 这块的未来信息。它每一步会接受当前一步 Input token的 Encoder 的输出以及上一步的 Decoder 的输出，生成当前 Decoder output，即针对当前输入的预测结果。这点和 Encoder 不同，Encoder 是一次性把全部输入所有单词扔进去得到映射结果。
+- 另一点和 Encoder 不同的是，**Decoder 需要 word-by-word prediction来预测下一个 token**，因此它不能有 Output 这块的未来信息。它预测每一个单词时，会用到 Encoder 对**整个输入句子**的输出（通过 cross attention），以及 Decoder 已经生成的全部历史单词。推理时它只能一个一个单词地生成；训练时则把整个目标句子一次性送进去（teacher forcing），靠 look-ahead mask 保证每个位置只能看到它之前的单词，这样不用写循环也能并行训练。
 
 #### 3.8.1 Data Preprocessing 数据预处理
 
@@ -972,7 +987,7 @@ Decoder流程的特点是：
 
 #### 3.8.2 First Multi-Headed Attention 第一个多头注意力模块
 
-Decoder中的第一个多头注意力模块依然还是 Self Attention，其输入的 Q, K, V 全都来自 Decoder 最开始的输入 tgt。其结构和 Encoder 中的多头注意力模块是完全相同的，但一些细节稍有不同。因为 Decoder 是 word-by-word prediction，每次通过历史的所有单词来预测未来的一个单词，因此它不能像 Encoder 那样一次性输入整个句子，而是只能 word-by-word 输入。因此，我们在计算 Attention 中的那个 Attention Matrix（Score Matrix，即那个 $A=QK^T$ 的结果）之后 ，必须要屏蔽掉和未来信息相关的那些 scores 值。
+Decoder中的第一个多头注意力模块依然还是 Self Attention，其输入的 Q, K, V 全都来自 Decoder 最开始的输入 tgt。其结构和 Encoder 中的多头注意力模块是完全相同的，但一些细节稍有不同。因为 Decoder 是 word-by-word prediction，每次通过历史的所有单词来预测未来的一个单词。训练时为了并行，我们还是会把整个目标句子一次性输入，因此在计算 Attention 中的那个 Score Matrix（即 $QK^T$ 的结果）之后、softmax 之前，必须要屏蔽掉和未来信息相关的那些 scores 值。
 
 如下面右图所示的是 Self Attention 中的 Softmax 的结果，显然划掉的那些数值是不存在的，因为它们都用到了未来信息。
 
@@ -984,9 +999,9 @@ Decoder中的第一个多头注意力模块依然还是 Self Attention，其输�
 
 注意这里之所以是 -inf 值而不是 0。原因在前面 Encoder Attention 中讲过了，是因为接下来马上就要计算 Softmax，而 Softmax 计算公式是 $e^x/sum(e^x)$ ，而我们最终目标是 Softmax 后将这些不需要的元素变成 0，而只有 $e^{-\inf}=0$ 才成立。因此要设成极小值 -inf 才行。
 
-再次回顾一下 Encoder 的 Attention 中的这个 mask 矩阵的设计。它的作用是屏蔽掉 scores 中的某些元素。为何需要？这是因为，我们的训练数据通常是句子 sentences，而每个句子的长度显然是不同的，而训练中的Batch则通常是一个固定大小的数组，例如 (batch_size, seq_len)，其中 seq_len 是一个对于当前batch的固定值，通常设定成当前batch中全部句子的最大长度（有时也会设置成一个全局的整个数据集的最大长度）。因此，不难看出，batch中会有很多句子结束后是空的。那么如何处理？通常我们的做法是，**给句子后面pad一个默认的invalid index，例如 pad 0**，并把例如 id=0 认为是一个 invalid token。另外，如果一个训练集中的 word 不在 vocabulary 中，它也被认为是 invalid token 而赋予 id=0。这样的话，在计算 scores 数组时，我们想要排除掉这些 invalid token 和其他 tokens之间的关联，即将scores中的这些 invalid tokens 所对应的位置都设成0，即将这些位置mask掉。
+再次回顾一下 Encoder 的 Attention 中的这个 mask 矩阵的设计。它的作用是屏蔽掉 scores 中的某些元素。为何需要？这是因为，我们的训练数据通常是句子 sentences，而每个句子的长度显然是不同的，而训练中的Batch则通常是一个固定大小的数组，例如 (batch_size, seq_len)，其中 seq_len 是一个对于当前batch的固定值，通常设定成当前batch中全部句子的最大长度（有时也会设置成一个全局的整个数据集的最大长度）。因此，不难看出，batch中会有很多句子结束后是空的。那么如何处理？通常我们的做法是，**给句子后面pad一个默认的invalid index，例如 pad 0**，并把例如 id=0 认为是一个 invalid token。另外，如果一个训练集中的 word 不在 vocabulary 中，它也被认为是 invalid token 而赋予 id=0。这样的话，在计算 scores 数组时，我们想要排除掉这些 invalid token 和其他 tokens之间的关联，即将这些位置 mask 掉（softmax 之后权重为 0）。
 
-但是，Encoder中的Attention使用的 src_mask 和 Decoder 中使用的 tgt_mask 的作用是不同的。前者只用在 Encoder’s self attention 中，而后者则是用在 Decoder’s self attention和cross attention。因为 Encoder 中我们可以看到整个数据集，因此 src_mask 只需要屏蔽掉那些 invalid token，即 id=0 的位置，包括 padding token 和不在 dictionary 中的 word id。因此它的实现非常简单：`src_mask = (src != 0)` 即可，其中 src 就是 (b, seq_len)，它在创建时 dataset 时建立，包含的是每个单词对应的 word idx。
+但是，Encoder中的Attention使用的 src_mask 和 Decoder 中使用的 tgt_mask 的作用是不同的。src_mask 用在 Encoder 的 self attention 和 Decoder 的 cross attention 中（cross attention 的 K、V 来自 Encoder，屏蔽的是 src 里的 pad），而 tgt_mask 只用在 Decoder 的 self attention 中。因为 Encoder 中每个单词可以看到整个输入句子，因此 src_mask 只需要屏蔽掉那些 invalid token，即 id=0 的位置，包括 padding token 和不在 dictionary 中的 word id。因此它的实现非常简单：`src_mask = (src != 0)` 即可，其中 src 就是 (b, seq_len)，它在创建时 dataset 时建立，包含的是每个单词对应的 word idx。
 
 而 tgt_mask 则不然，因为 Decoder 中当前单词是不能看到未来信息的，因此 tgt_mask 不但要屏蔽 invalid token，还要屏蔽未来token，后者就是上面讲的 look-ahead mask 来实现的。因此 tgt_mask 最终就是相当于 src_mask 这种形式的 mask 和 look-ahead mask 的“且&”操作的结果。
 
@@ -1062,7 +1077,7 @@ class DecoderLayer(nn.Module):
         # size: embedding size, 通常等于 d_model
         # self_attn, src_attn, feed_forward 要提前定义好, 其中 src_attn 是使用了 Encoder source data 的 attention 机制
         # dropout: dropout ratio
-        # 类似的, 这里的 size 只用来传入 Decoder 中用于其 LayerNorm 的定义, 而 DecoderLayer 中则不用
+        # 类似的, size 在 DecoderLayer 里用于 SublayerConnection 中 LayerNorm 的定义, Decoder 也会读取 layer.size
         super(DecoderLayer, self).__init__()
         self.size = size
         self.self_attn = self_attn
@@ -1072,8 +1087,8 @@ class DecoderLayer(nn.Module):
 
     def forward(self, x, memory, src_mask, tgt_mask):
         # x: (batch_size, seq_len, d_model)
-        # memory: (batch_size, seq_len, d_model)
-        # src_mask: (batch_size, 1, seq_len, seq_len), tgt_mask: (batch_size, seq_len, seq_len)
+        # memory: (batch_size, src_len, d_model)
+        # src_mask: (batch_size, 1, src_len), tgt_mask: (batch_size, seq_len, seq_len)
         # return: (batch_size, seq_len, d_model)
         #! NOTE: 同样类似 Encoder 中的定义, 这里的某些 SublayerConnection() 的第二个参数是关于attention的函数而不是数值。
         #! 这是为了将其作为类似一个 Layer 的形式传入
@@ -1195,8 +1210,8 @@ def make_model(src_vocab, tgt_vocab, N=6, d_model=512, d_ff=2048, h=8, dropout=0
 
     encoder = Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout), N)
     decoder = Decoder(DecoderLayer(d_model, c(attn), c(attn), c(ff), dropout), N)
-    src_embed = nn.Sequential(Embeddings(src_vocab, d_model), pos_embed)
-    tgt_embed = nn.Sequential(Embeddings(tgt_vocab, d_model), pos_embed)
+    src_embed = nn.Sequential(Embeddings(d_model, src_vocab), pos_embed)
+    tgt_embed = nn.Sequential(Embeddings(d_model, tgt_vocab), pos_embed)
     generator = Generator(d_model, tgt_vocab)
 
     model = Transformer(encoder, decoder, src_embed, tgt_embed, generator)
@@ -1219,7 +1234,7 @@ Label Smoothing 参考论文： [https://arxiv.org/pdf/1512.00567](https://arxiv
 
 这个方法具体实现了什么呢？
 
-我们使用 Transformer 来预测未来的每个单词，那么如何计算 Loss？常规的想法是：我们预测的是整个 vocab 单词库中所有单词的概率值，其中那个我们需要的正确的单词的概率是最大的，其余尽量最小。即，我们预测一个长度是 $y=[v]$ 的向量，假设正确的单词即 Groundtruth Word ID 的位置是 $j$ 的话，我们期待是 $v_j$ 最大，例如 1.0，其他全部位置的 $v_i$ 都尽量小，例如 0.0。这样的 y 就可以认为是一个 **Groudtruth Distribution 即真实分布了。**然后，用我们的网络预测值 $\hat{y}$ 和这个真实值 $y$ 对比计算 Loss 即可，例如可以用 KL Divergence 来计算两个分布之间的距离： [https://docs.pytorch.org/docs/stable/generated/torch.nn.KLDivLoss.html#kldivloss](https://docs.pytorch.org/docs/stable/generated/torch.nn.KLDivLoss.html#kldivloss) 
+我们使用 Transformer 来预测未来的每个单词，那么如何计算 Loss？常规的想法是：我们预测的是整个 vocab 单词库中所有单词的概率值，其中那个我们需要的正确的单词的概率是最大的，其余尽量最小。即，我们预测一个长度是 $y=[v]$ 的向量，假设正确的单词即 Groundtruth Word ID 的位置是 $j$ 的话，我们期待是 $v_j$ 最大，例如 1.0，其他全部位置的 $v_i$ 都尽量小，例如 0.0。这样的 y 就可以认为是一个 **Groundtruth Distribution 即真实分布了。**然后，用我们的网络预测值 $\hat{y}$ 和这个真实值 $y$ 对比计算 Loss 即可，例如可以用 KL Divergence 来计算两个分布之间的距离： [https://docs.pytorch.org/docs/stable/generated/torch.nn.KLDivLoss.html#kldivloss](https://docs.pytorch.org/docs/stable/generated/torch.nn.KLDivLoss.html#kldivloss) 
 
 举例：例如 $v=8$ , 对应的 Groundtruth word ID index $j=3$ ，那么理想的 $y = [0,0,0,1,0,0,0,0]$
 
@@ -1236,22 +1251,22 @@ class LabelSmoothing(nn.Module):
     实现一个 smoothing distribution 来替代传统的 distribution 的比较方式. 具体见 forward() 中的记录
     """
 
-	def __init__(self, size, padding_idx, smoothing=0.0):
+    def __init__(self, size, padding_idx, smoothing=0.0):
         # size: vocabulary size 注意这个不是 d_model 了
         # padding_idx: index of padding token in vocabulary, usually 0
         # smoothing: smoothing parameter (epsilon), default is 0.0 (no smoothing) 通常用较小的值例如 0.1
-        super(LabelSmoothing,self).__init__()
+        super(LabelSmoothing, self).__init__()
 
         # KLDivLoss expects log probabilities as input and probabilities as target
         # reduction="sum" means the loss will be summed over all elements
-				self.criterion= nn.KLDivLoss(reduction="sum")
-				self.padding_idx= padding_idx
-				self.confidence= 1.0- smoothing  # Probability assigned to correct class
-				self.smoothing= smoothing  # Smoothing parameter (epsilon)
-				self.size= size  # Vocabulary size
-				self.true_dist=None  # Store distribution for visualization/debugging
+        self.criterion = nn.KLDivLoss(reduction="sum")
+        self.padding_idx = padding_idx
+        self.confidence = 1.0 - smoothing  # Probability assigned to correct class
+        self.smoothing = smoothing  # Smoothing parameter (epsilon)
+        self.size = size  # Vocabulary size
+        self.true_dist = None  # Store distribution for visualization/debugging
 
-	def forward(self, x, target):
+    def forward(self, x, target):
         # x: model output logits after log_softmax, shape [b, v], where v is vocabulary size
         # target: groundtruth true labels, shape [b]
         # return: loss value
@@ -1259,17 +1274,17 @@ class LabelSmoothing(nn.Module):
         # 的 b 其实指的是 batch size * seq_len. target同理, 被reshape成了只有1个维度, 类似 [b,n] -> [b*n]
 
         # Ensure input has correct vocabulary size dimension
-				assert x.size(1)==self.size
+        assert x.size(1) == self.size
 
         # Create a copy of input tensor to build our smoothed target distribution
         # [b, v]
-        true_dist= x.data.clone()
+        true_dist = x.data.clone()
 
         # Fill with small probability for all classes
         # We divide by (size-2) to account for correct class and padding token
         # 默认全部赋予一个非常小的值, 例如 smoothing=0.1, size=10000, 那么这个值接近 1e-5
         # [b, v]
-        true_dist.fill_(self.smoothing/ (self.size- 2))
+        true_dist.fill_(self.smoothing / (self.size - 2))
 
         # Put the confidence (1-smoothing) probability on the correct class
         # unsqueeze(1) converts target from [batch_size] to [batch_size, 1]
@@ -1282,22 +1297,22 @@ class LabelSmoothing(nn.Module):
         #! 而 index=target.data.unsqueeze(1) 其实就是 target word ID index.
         #! 总结的话就是, 把 true_dist 的维度 dim=1 这里维度上的, index = groundtruth word ID from target 的这些
         #! 位置上都赋值为 confidence 值, 例如 0.9 (剩下全部位置还是上面计算得到的一个极小值)
-        true_dist.scatter_(1, target.data.unsqueeze(1),self.confidence)
+        true_dist.scatter_(1, target.data.unsqueeze(1), self.confidence)
 
         # Set probability for padding token to 0 将pad所在的位置全部设为0
-        true_dist[:,self.padding_idx]= 0
+        true_dist[:, self.padding_idx] = 0
 
         # Find positions where target is padding token
         # 找到 target 中的 pad 所在的全部位置的 indices
-        mask= torch.nonzero(target.data==self.padding_idx)
+        mask = torch.nonzero(target.data == self.padding_idx)
 
         # If padding tokens exist in target
-				if mask.dim()> 0:
+        if mask.dim() > 0:
             # index_fill_(dim, index, value) 是将第dim维度中的index数组记录的位置都设置为value
             # 这里就是将 true_dist 中的这些 (对应target中的) pad indices 都设为 0
             true_dist.index_fill_(0, mask.squeeze(), 0.0)
 
-				self.true_dist= true_dist  # 这就是新的 Smoothed Groundtruth distribution
+        self.true_dist = true_dist  # 这就是新的 Smoothed Groundtruth distribution
 
         # 计算 x 和新的 smoothed groundtruth distribution 的 KL Divergence Loss
         #!NOTE: 本函数的输入x通常是Transformer整个流程的输出结果, 其最后一层是 Generator. 从它的 forward 函数定义
@@ -1305,7 +1320,7 @@ class LabelSmoothing(nn.Module):
         #! true_dist并没有计算log, 那么下面这个方法为何正确呢？这是因为, criterion 即 nn.KLDivLoss(input, target) 比较特别
         #! 它的输入 input 已经被要求要在 log-space 了, 而 target 则默认没有被要求(有个参数可以切换 target 是否已经
         #! 在这里面了）
-				return self.criterion(x, true_dist)
+        return self.criterion(x, true_dist)
 
 ```
 
@@ -1378,7 +1393,7 @@ class SimpleLossCompute:
         return loss.item() * norm_factor
 ```
 
-Loss Instance 的调用比较直观，参见下面代码。指的注意的是，这个 loss(x,y) 输入的 x,y 是什么？显然 x 是 Transformer 网络输出结果，而 y 则是 groundtruth。具体呢？
+Loss Instance 的调用比较直观，参见下面代码。值得注意的是，这个 loss(x,y) 输入的 x,y 是什么？显然 x 是 Transformer 网络输出结果，而 y 则是 groundtruth。具体呢？
 
 训练中，对于一个 Batch，我们已知：
 
@@ -1408,7 +1423,7 @@ def run_epoch(self, data, loss_compute):
     for i, batch in enumerate(data):
         batch = batch.to(self.device)
         out = self.model(batch.src, batch.tgt, batch.src_mask, batch.tgt_mask)
-        # 调用时，follow __call__() API in SimpleLossCompute()，而 tgt_y 就是提到的每个位置错开一位的 tgt[:, 1:t] 这样
+        # 调用时，follow __call__() API in SimpleLossCompute()，而 tgt_y 就是提到的每个位置错开一位的 tgt[:, 1:] 这样
         loss = loss_compute(out, batch.tgt_y, batch.ntokens)
         total_loss += loss
         total_tokens += batch.ntokens
@@ -1422,7 +1437,7 @@ def run_epoch(self, data, loss_compute):
             tokens = 0
 
     # 最终返回 loss per token
-  return total_loss / total_tokens
+    return total_loss / total_tokens
 ```
 
 ### 3.11 推理 Inference
@@ -1430,7 +1445,7 @@ def run_epoch(self, data, loss_compute):
 推理流程就是大致的常规推理流程，值得注意的几个点：
 
 - 如上一章所讲，Generator 并未放在 Transformer 类中，而 Transformer decode() 返回的只是 Decoder 的输出（即 Generator 的输入），因此，在得到 decode() 输出后，要再显式调用 Generator 推理来输出最终的 y_pred，它是 `[b, seq_len, vocab]` 的。而在推理中我们只需要它的最后一个单词即当前时刻 t 的单词的信息，因此就是 `y_pred[b, -1]` 这样，它是 `[b, vocab]` 大小，然后从中找到概率最大的那个位置 max_idx 对应的单词就是我们所需的最终输出了。
-- 我们的推理流程是类似一个循环，每次用此前预测的全部结果 [0:t] 来预测将来时刻 t 的结果。因此，当按照上面方法预测得到时刻 t 的单词后，我们要将其加入到历史信息中，然后在这个循环中接着预测下一个单词。那么什么时候结束？实际上我们通常是设定一个 max_pred_len，其实就是 max_tokens，例如 100。这个预测循环会预测全部 100 个单词，其中肯定有 EOS 这种 label 值（我们在创建 training dataset 中加入过，用于表示每个句子的结尾）。因此，推理结束后，从这 100 个单词从左往右找，遇到 EOS 就结尾，这之前的全部的预测单词就是我们所需的整个句子的最终结果。
+- 我们的推理流程是类似一个循环，每次用此前预测的全部结果 [0:t] 来预测将来时刻 t 的结果。因此，当按照上面方法预测得到时刻 t 的单词后，我们要将其加入到历史信息中，然后在这个循环中接着预测下一个单词。那么什么时候结束？实际上我们通常是设定一个 max_pred_len，其实就是 max_tokens，例如 100。这个预测循环会预测全部 100 个单词（也可以在所有句子都生成了 EOS 后提前结束），其中通常会有 EOS 这种 label 值（我们在创建 training dataset 中加入过，用于表示每个句子的结尾）。因此，推理结束后，从这 100 个单词从左往右找，遇到 EOS 就结尾，这之前的全部的预测单词就是我们所需的整个句子的最终结果。
 
 一个推理实现的例子。
 

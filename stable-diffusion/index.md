@@ -37,6 +37,69 @@ description: "Classic Stable Diffusion 1.x module by module: CLIP text encoding,
 
 本文主要参考 Latent Diffusion 论文 [[1]](#ref-1)（SD 就是它在大规模图文数据上的版本）和官方仓库 [[2]](#ref-2)；直观的图解推荐 [[5]](#ref-5)。正文里用 [n] 标出具体出处，完整列表见文末「参考资料」。
 
+## 背景与预备知识
+
+Stable Diffusion 是把几个已有的模块拼在一起：扩散模型、VAE、Transformer 的注意力、CLIP。这一节把每块需要的最少知识补齐，后面讲到时就不再从头解释。已经熟悉的读者可以直接跳到第 0 节。
+
+### 需要先知道的四样东西
+
+| 模块 | 在 SD 里干什么 | 只需要知道 | 详细讲解 |
+|---|---|---|---|
+| 扩散模型（DDPM / DDIM） | 生成的核心：从噪声一步步去噪 | 训练是预测噪声的 MSE；采样是从纯噪声循环调用网络 | [DDPM 篇](/deep-learning/ddpm-from-scratch/)、[DDIM 篇](/deep-learning/ddim/) |
+| VAE | 把图像压缩成小的 latent，扩散在 latent 上做 | 编码器 $$x \to z$$、解码器 $$z \to x$$，两者都冻结 | [VAE 笔记](/deep-learning/generative-models-1-vae/) |
+| 注意力（attention） | 让图像特征"读"文本 | $$\operatorname{softmax}(QK^\top/\sqrt d)\,V$$；Q 和 K、V 可以来自不同的序列 | [Transformer 笔记](/deep-learning/transformer-study/) 第 3.4、3.8.3 节 |
+| CLIP | 把 prompt 变成向量 | 它的文本向量和图像语义是对齐的 | 下面一小节 |
+
+### CLIP：为什么它的文本向量"懂画面"
+
+CLIP [[4]](#ref-4) 有一个图像编码器和一个文本编码器，用约 4 亿个从网上收集的"图片 + 配文"对训练。训练目标很直接：**配对的图和文，向量要尽量相似；不配对的，要尽量不相似**（对比学习）。一个 batch 里有 $$N$$ 对图文时，核心代码只有几行：
+
+```python
+import torch
+import torch.nn.functional as F
+
+def clip_contrastive_loss(image_emb, text_emb, temperature=0.07):
+    # image_emb, text_emb: [N, D]，第 i 张图和第 i 段文字是一对
+    image_emb = F.normalize(image_emb, dim=-1)              # 归一化后点积 = 余弦相似度
+    text_emb = F.normalize(text_emb, dim=-1)
+    # logits[i, j]：图 i 和文 j 的相似度
+    logits = image_emb @ text_emb.T / temperature           # [N, N]
+    labels = torch.arange(len(logits))                      # 正确答案在对角线上
+    return (F.cross_entropy(logits, labels) +               # 每张图从 N 段文字里认出自己的那段
+            F.cross_entropy(logits.T, labels)) / 2          # 每段文字从 N 张图里认出自己的那张
+
+# 随机向量时约 2.1，接近 ln 8 ≈ 2.08，即瞎猜的水平
+print(clip_contrastive_loss(torch.randn(8, 512), torch.randn(8, 512)))
+```
+
+这样训练出来的文本编码器，输出的向量天然带着"这段话对应什么样的画面"的信息，比只在纯文本上训练的语言模型更适合指导画图。Stable Diffusion 只借用 CLIP 的**文本编码器**，并且冻结不训练。
+
+### Cross-attention：一个能跑的最小例子
+
+SD 里文本影响图像的唯一入口是 cross-attention（第 5.5 节）。它和 Transformer 里 Decoder 的 cross attention 是同一回事：**query 来自图像特征，key 和 value 来自文本**。用一个 $$2 \times 2$$ 的特征图（4 个位置）和 3 个文本 token 看一遍 shape：
+
+```python
+torch.manual_seed(0)
+C, d = 8, 8                                   # 特征通道数、注意力维度
+feat = torch.randn(1, C, 2, 2)                # 图像特征 [B, C, H, W]
+text = torch.randn(1, 3, 16)                  # 文本 token [B, 3, 16]（SD 里是 [B, 77, 768]）
+
+W_q, W_k, W_v = torch.randn(C, d), torch.randn(16, d), torch.randn(16, d)
+x = feat.flatten(2).transpose(1, 2)           # [B, HW, C] = [1, 4, 8]：每个位置是一个 token
+Q = x @ W_q                                    # [1, 4, 8]  4 个图像位置的 query
+K, V = text @ W_k, text @ W_v                  # [1, 3, 8]  3 个文本 token 的 key、value
+A = (Q @ K.transpose(1, 2) / d ** 0.5).softmax(dim=-1)   # [1, 4, 3]
+print(A[0].sum(dim=-1))                        # 每一行和为 1：每个位置在 3 个词上的分配
+out = A @ V                                    # [1, 4, 8]  每个位置得到一份"加权的文本信息"
+out = out.transpose(1, 2).reshape(1, d, 2, 2)  # 再变回特征图 [B, d, H, W]
+```
+
+注意力矩阵 `A` 的第 $$i$$ 行就是"第 $$i$$ 个像素位置该听哪个词的"。SD 里这个矩阵是 `[B, heads, HW, 77]`，把某一个词对应的那一列取出来、变回 $$H \times W$$，就能看到这个词在图上"管"哪片区域，Prompt-to-Prompt 等图像编辑方法就是在操作这张图。
+
+### 一句话串起来
+
+训练时：图像经 VAE 编码成 latent，按 DDPM 的方式加噪，U-Net 一边看带噪 latent 和时间步、一边通过 cross-attention 读 CLIP 给出的文本向量，预测噪声，算 MSE。生成时：从随机 latent 出发，U-Net 在文本引导下反复去噪（用 DDIM 等采样器），最后交给 VAE 解码成图像。下面各节就按这条数据流逐个拆开。
+
 ## 0. 全文路线
 
 | 节 | 模块 | 一句话 | 可训练？ |
@@ -1458,5 +1521,5 @@ assert abs(torch.cumprod(1 - betas, 0)[-1].sqrt().item() - 0.068) < 1e-3
 - <a id="ref-2"></a>**[2] 官方仓库**：CompVis/stable-diffusion [github.com/CompVis/stable-diffusion](https://github.com/CompVis/stable-diffusion)。SD 1.x 的原始代码和配置（`v1-inference.yaml` 里有 U-Net 的全部超参数）。
 - <a id="ref-3"></a>**[3] Diffusers 文档**：Hugging Face Diffusers [huggingface.co/docs/diffusers/en/index](https://huggingface.co/docs/diffusers/en/index)。第 6～8 节的 `UNet2DConditionModel`、scheduler 和 pipeline 用法。
 - <a id="ref-4"></a>**[4] CLIP**：Radford et al. *Learning Transferable Visual Models From Natural Language Supervision*. ICML 2021. [arxiv.org/abs/2103.00020](https://arxiv.org/abs/2103.00020)。第 2 节的文本编码器。
-- <a id="ref-5"></a>**[5] 图解博客**：Jay Alammar. *The Illustrated Stable Diffusion*. [jalammar.github.io/illustrated-stable-diffusion/](https://jalammar.github.io/illustrated-stable-diffusion/)。把数据流画得很清楚，适合先看一遍建立整体印象。
+- <a id="ref-5"></a>**[5] 图解博客（适合最先看）**：Jay Alammar. *The Illustrated Stable Diffusion*. [jalammar.github.io/illustrated-stable-diffusion/](https://jalammar.github.io/illustrated-stable-diffusion/)。把数据流画得很清楚，适合先看一遍建立整体印象。
 - <a id="ref-6"></a>**[6] CFG**：Ho, Salimans. *Classifier-Free Diffusion Guidance*. 2022. [arxiv.org/abs/2207.12598](https://arxiv.org/abs/2207.12598)。第 8 节推理时的引导。
