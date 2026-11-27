@@ -28,6 +28,8 @@ description: "A complete DDPM implementation from scratch in PyTorch, formula by
 
 完整的理论推导（ELBO 等）见之前的笔记 [Diffusion Models 扩散模型学习](/deep-learning/diffusion-study/)，这里只推导写代码需要的部分。
 
+本文的公式和算法主要参考 DDPM 原论文 [[1]](#ref-1)，直观理解推荐 Lilian Weng 的博客 [[2]](#ref-2)；正文里用 [n] 标出具体出处，完整列表见文末「参考资料」。
+
 ## 0. 全文路线
 
 DDPM 分成训练和采样两条线，共用同一张噪声调度表和同一个网络：
@@ -157,7 +159,7 @@ def denormalize(images):
 
 ### 3.1 是什么、为什么
 
-前向过程一共 $$T$$ 步，每步加多少噪声由 $$\beta_t$$ 决定。DDPM 用最简单的**线性 schedule**：$$\beta_t$$ 从很小的 $$\beta_1 = 10^{-4}$$ 线性增加到 $$\beta_T = 0.02$$，开始时加得少、后面加得多。
+前向过程一共 $$T$$ 步，每步加多少噪声由 $$\beta_t$$ 决定。DDPM 用最简单的**线性 schedule**：$$\beta_t$$ 从很小的 $$\beta_1 = 10^{-4}$$ 线性增加到 $$\beta_T = 0.02$$，开始时加得少、后面加得多。 [[1]](#ref-1)
 
 由 $$\beta_t$$ 可以算出后面所有公式要用的系数：
 
@@ -243,7 +245,7 @@ $$T = 300$$ 时几个时间步的数值（表头是论文的 $$t$$，代码下�
 
 ### 4.1 是什么、为什么
 
-前向过程是一条固定的马尔可夫链，每一步在上一步的基础上加一点高斯噪声：
+前向过程是一条固定的马尔可夫链，每一步在上一步的基础上加一点高斯噪声 [[1]](#ref-1)[[2]](#ref-2)：
 
 $$
 q(x_t \mid x_{t-1}) = \mathcal{N}\big(x_t;\ \sqrt{\alpha_t}\,x_{t-1},\ \beta_t I\big)
@@ -552,7 +554,7 @@ class SpatialSelfAttention(nn.Module):
 
 ### 6.1 是什么、为什么
 
-训练不需要走完整条链。每个 batch 只做四件事：随机抽时间步、随机抽噪声、用第 4 节的闭式公式一步造出 $$x_t$$、让网络预测那份噪声：
+训练不需要走完整条链。每个 batch 只做四件事：随机抽时间步、随机抽噪声、用第 4 节的闭式公式一步造出 $$x_t$$、让网络预测那份噪声 [[1]](#ref-1)：
 
 $$
 t \sim \operatorname{Uniform}\{1,\dots,T\},\qquad
@@ -634,7 +636,7 @@ def train_ddpm(model, optimizer, dataloader, sched, num_epochs, device):
 
 ### 7.1 是什么、为什么
 
-生成时没有 $$x_0$$，只能从纯噪声 $$x_T \sim \mathcal{N}(0, I)$$ 出发，一步步往回走：$$x_T \to x_{T-1} \to \cdots \to x_0$$。每一步需要知道 $$p(x_{t-1} \mid x_t)$$。
+生成时没有 $$x_0$$，只能从纯噪声 $$x_T \sim \mathcal{N}(0, I)$$ 出发，一步步往回走：$$x_T \to x_{T-1} \to \cdots \to x_0$$。每一步需要知道 $$p(x_{t-1} \mid x_t)$$。 [[1]](#ref-1)
 
 关键事实：如果**同时知道** $$x_t$$ 和 $$x_0$$，前向过程的"反方向"是一个可以算出来的高斯（真实后验）：
 
@@ -836,7 +838,7 @@ class ClassConditionedTinyUNet(TinyUNet):
 
 ### 9.2 Classifier-free guidance（CFG）
 
-只加条件，模型生成的图往往"像但不够像"。CFG 在采样时把**有条件预测**和**无条件预测**的差放大：
+只加条件，模型生成的图往往"像但不够像"。CFG 在采样时把**有条件预测**和**无条件预测**的差放大 [[3]](#ref-3)：
 
 $$
 \hat\epsilon_{\text{cfg}} = \epsilon_\theta(x_t, t, \varnothing) + w\,\big(\epsilon_\theta(x_t, t, y) - \epsilon_\theta(x_t, t, \varnothing)\big)
@@ -881,7 +883,7 @@ def predict_noise_cfg(model, x_t, t, labels, w):
 
 ### 10.1 三种预测目标
 
-前面一直让网络预测噪声 $$\epsilon$$。但 U-Net 只是一个"图像进、图像出"的结构，它也可以被训练成预测别的量。为了简洁，记
+前面一直让网络预测噪声 $$\epsilon$$。但 U-Net 只是一个"图像进、图像出"的结构，它也可以被训练成预测别的量。为了简洁，记 [[4]](#ref-4)
 
 $$
 a_t = \sqrt{\bar\alpha_t},\qquad s_t = \sqrt{1-\bar\alpha_t},\qquad x_t = a_t x_0 + s_t \epsilon,\qquad a_t^2 + s_t^2 = 1
@@ -1026,3 +1028,10 @@ with torch.no_grad():
 - **DDIM 为什么能跳步？** 它和 DDPM 共用同一个训练好的网络，只是换了一个非马尔可夫的反向过程：先估计 $$\hat x_0$$，再直接跳到任意更早的时间步。$$\eta = 0$$ 时完全确定，同一个初始噪声总是得到同一张图。
 - **CFG 的代价是什么？** 训练时只需以 10% 的概率把标签换成空类别；采样时每步要算两次网络（有条件、无条件），速度减半，换来更强的类别一致性。
 - **$$\epsilon$$、$$x_0$$、$$v$$ 选哪个？** 三者可以互相换算，采样器的后半段共用。差别在于网络误差传到 $$\hat x_0$$ 时放大多少：$$\epsilon$$ 在高噪声端放大 $$1/\sqrt{\bar\alpha_t}$$ 倍，$$v$$ 永远不放大。
+
+## 参考资料
+
+- <a id="ref-1"></a>**[1] 主论文**：Ho, Jain, Abbeel. *Denoising Diffusion Probabilistic Models*. NeurIPS 2020. [arxiv.org/abs/2006.11239](https://arxiv.org/abs/2006.11239)。前向加噪、预测噪声的训练目标、采样公式都来自这篇；官方代码（TensorFlow）在 [hojonathanho/diffusion](https://github.com/hojonathanho/diffusion)。
+- <a id="ref-2"></a>**[2] 写得很清楚的博客**：Lilian Weng. *What are Diffusion Models?* [lilianweng.github.io/posts/2021-07-11-diffusion-models/](https://lilianweng.github.io/posts/2021-07-11-diffusion-models/)。从前向过程推到训练目标的完整推导，公式细节不清楚时先看这篇。
+- <a id="ref-3"></a>**[3] CFG**：Ho, Salimans. *Classifier-Free Diffusion Guidance*. 2022. [arxiv.org/abs/2207.12598](https://arxiv.org/abs/2207.12598)。第 9 节的训练时丢标签、采样时两路预测外推。
+- <a id="ref-4"></a>**[4] v-prediction**：Salimans, Ho. *Progressive Distillation for Fast Sampling of Diffusion Models*. ICLR 2022. [arxiv.org/abs/2202.00512](https://arxiv.org/abs/2202.00512)。第 10 节的 v 参数化出自这篇。

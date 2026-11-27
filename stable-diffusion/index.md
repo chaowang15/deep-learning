@@ -35,6 +35,8 @@ description: "Classic Stable Diffusion 1.x module by module: CLIP text encoding,
 
 这一篇按数据流把这些模块逐个拆开，目标是**看懂一个 prompt 是怎么一步步变成一张图的，每一步的 tensor 是什么 shape，以及每个模块的核心代码怎么写**。以经典的 **Stable Diffusion 1.x（1.4 / 1.5）** 为准，生成 $$512 \times 512$$ 的图；SD 2.x、SDXL、SD3 的改动在相应位置简单提一下。
 
+本文主要参考 Latent Diffusion 论文 [[1]](#ref-1)（SD 就是它在大规模图文数据上的版本）和官方仓库 [[2]](#ref-2)；直观的图解推荐 [[5]](#ref-5)。正文里用 [n] 标出具体出处，完整列表见文末「参考资料」。
+
 ## 0. 全文路线
 
 | 节 | 模块 | 一句话 | 可训练？ |
@@ -99,7 +101,7 @@ description: "Classic Stable Diffusion 1.x module by module: CLIP text encoding,
 <figcaption>灰色是冻结或无参数的模块，蓝色是唯一需要训练的 U-Net。</figcaption>
 </figure>
 
-整个系统里只有 U-Net 在训练；其余模块要么没有参数（tokenizer、scheduler），要么是预训练好之后冻结的（CLIP 文本编码器、VAE）。用公式写，推理就是三行：
+整个系统里只有 U-Net 在训练；其余模块要么没有参数（tokenizer、scheduler），要么是预训练好之后冻结的（CLIP 文本编码器、VAE）。用公式写，推理就是三行 [[1]](#ref-1)[[5]](#ref-5)：
 
 $$
 \hat\epsilon = \epsilon_\theta(z_t, t, c),\qquad
@@ -125,7 +127,7 @@ $$
 
 ### 2.1 是什么、为什么分两步
 
-网络不能直接吃字符串，所以文本条件分两步：
+网络不能直接吃字符串，所以文本条件分两步 [[4]](#ref-4)：
 
 1. **Tokenizer**：把字符串切成子词（BPE），查词表得到整数下标，补齐到固定长度 77。它是一个确定的预处理算法，**没有可学习参数**。
 2. **CLIP 文本编码器**：一个 12 层的 Transformer，把每个下标变成一个 768 维向量，并且通过 self-attention 让每个 token 的向量带上上下文信息。
@@ -213,7 +215,7 @@ text_encoder(input_ids)  →  BaseModelOutputWithPooling
 
 ### 3.1 是什么、为什么
 
-在 $$512 \times 512 \times 3$$ 的像素空间直接做扩散，U-Net 每一步都要处理 78 万个数，大部分算力花在人眼几乎看不出差别的高频细节上。Latent Diffusion（Stable Diffusion 的前身）的做法是：先训练一个自编码器，把图像压缩成小得多的 latent，再**在 latent 空间里做扩散**。
+在 $$512 \times 512 \times 3$$ 的像素空间直接做扩散，U-Net 每一步都要处理 78 万个数，大部分算力花在人眼几乎看不出差别的高频细节上。Latent Diffusion（Stable Diffusion 的前身）的做法是：先训练一个自编码器，把图像压缩成小得多的 latent，再**在 latent 空间里做扩散**。 [[1]](#ref-1)
 
 SD 1.x 的 VAE 在空间上缩小 8 倍，通道数为 4：
 
@@ -766,7 +768,7 @@ predicted_noise = unet(
 
 ## 6. 精确的 SD 1.5 U-Net：逐模块实现
 
-第 5 节的教学版只保留了信息流。这一节把每个模块换成 **SD 1.5 里真实的结构**：ResBlock 多了 dropout，attention 位置换成完整的 Spatial Transformer（self-attention + cross-attention + 前馈网络），每个 DownBlock 有 2 层、每个 UpBlock 有 3 层，一共 12 条 skip。拼起来的网络参数量是 **859,520,964**，和官方 `UNet2DConditionModel` 的 SD 1.5 权重逐个数字相同（6.8 节末尾验证）。
+第 5 节的教学版只保留了信息流。这一节把每个模块换成 **SD 1.5 里真实的结构**：ResBlock 多了 dropout，attention 位置换成完整的 Spatial Transformer（self-attention + cross-attention + 前馈网络），每个 DownBlock 有 2 层、每个 UpBlock 有 3 层，一共 12 条 skip。拼起来的网络参数量是 **859,520,964**，和官方 `UNet2DConditionModel` 的 SD 1.5 权重逐个数字相同（6.8 节末尾验证）。 [[2]](#ref-2)[[3]](#ref-3)
 
 模块之间的包含关系：
 
@@ -1234,7 +1236,7 @@ def stable_diffusion_training_step(images, prompts, tokenizer, text_encoder, vae
 
 ### 8.1 CFG 的两个辅助函数
 
-推理和 DDPM 篇第 9 节的 CFG 完全一样，只是"无条件"换成了**负向 prompt**（默认是空串）：
+推理和 DDPM 篇第 9 节的 CFG 完全一样，只是"无条件"换成了**负向 prompt**（默认是空串） [[6]](#ref-6)：
 
 $$
 \hat\epsilon_{\text{cfg}} = \epsilon_\theta(z_t, t, c_{\text{neg}}) + w\,\big(\epsilon_\theta(z_t, t, c) - \epsilon_\theta(z_t, t, c_{\text{neg}})\big),\qquad w = 7.5
@@ -1449,3 +1451,12 @@ assert abs(torch.cumprod(1 - betas, 0)[-1].sqrt().item() - 0.068) < 1e-3
 - **真实 SD 1.5 的 U-Net 比教学版多了什么？** ResBlock 后面的 attention 换成 Spatial Transformer（self-attention → cross-attention → GEGLU 前馈，都是 pre-norm 残差）；DownBlock 2 层、UpBlock 3 层；每层输出、每次下采样和 `conv_in` 都存 skip，共 12 条，UpBlock 每层 pop 一条。参数量 859,520,964。
 - **一次训练做什么？** 编码图像 → 随机 $$t$$ 和噪声一步加噪 → 编码文本（10% 置空）→ U-Net 预测噪声 → MSE → 只更新 U-Net。
 - **一次推理做什么？** 编码正向和负向 prompt 一次 → 从随机 latent 开始，每步 U-Net（batch 翻倍）+ CFG + scheduler → VAE 解码一次。
+
+## 参考资料
+
+- <a id="ref-1"></a>**[1] 主论文**：Rombach et al. *High-Resolution Image Synthesis with Latent Diffusion Models*. CVPR 2022. [arxiv.org/abs/2112.10752](https://arxiv.org/abs/2112.10752)。VAE latent、cross-attention 条件和整体结构都来自这篇，详见 [LDM 篇](/deep-learning/latent-diffusion/)。
+- <a id="ref-2"></a>**[2] 官方仓库**：CompVis/stable-diffusion [github.com/CompVis/stable-diffusion](https://github.com/CompVis/stable-diffusion)。SD 1.x 的原始代码和配置（`v1-inference.yaml` 里有 U-Net 的全部超参数）。
+- <a id="ref-3"></a>**[3] Diffusers 文档**：Hugging Face Diffusers [huggingface.co/docs/diffusers/en/index](https://huggingface.co/docs/diffusers/en/index)。第 6～8 节的 `UNet2DConditionModel`、scheduler 和 pipeline 用法。
+- <a id="ref-4"></a>**[4] CLIP**：Radford et al. *Learning Transferable Visual Models From Natural Language Supervision*. ICML 2021. [arxiv.org/abs/2103.00020](https://arxiv.org/abs/2103.00020)。第 2 节的文本编码器。
+- <a id="ref-5"></a>**[5] 图解博客**：Jay Alammar. *The Illustrated Stable Diffusion*. [jalammar.github.io/illustrated-stable-diffusion/](https://jalammar.github.io/illustrated-stable-diffusion/)。把数据流画得很清楚，适合先看一遍建立整体印象。
+- <a id="ref-6"></a>**[6] CFG**：Ho, Salimans. *Classifier-Free Diffusion Guidance*. 2022. [arxiv.org/abs/2207.12598](https://arxiv.org/abs/2207.12598)。第 8 节推理时的引导。

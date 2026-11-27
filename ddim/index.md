@@ -29,6 +29,8 @@ description: "Why DDIM can sample in a few dozen steps with an unchanged DDPM mo
 
 最后用上一篇在 FashionMNIST 上训练的同一个模型做实验，所有图都是真实运行结果。
 
+本文主要参考 DDIM 原论文 [[1]](#ref-1)；它建立在 DDPM [[3]](#ref-3) 之上。正文里用 [n] 标出具体出处，完整列表见文末「参考资料」。
+
 ## 1. 符号约定
 
 沿用上一篇的记号，新增的只有"跳到哪一步"的 $$s$$ 和控制随机性的 $$\eta$$：
@@ -62,7 +64,7 @@ $$
 
 ## 3. 关键观察：训练只用到了边缘分布
 
-回头看 DDPM 的训练目标：
+回头看 DDPM 的训练目标 [[1]](#ref-1)：
 
 $$
 \mathcal{L}_{\text{simple}} = \mathbb{E}_{x_0,\,t,\,\epsilon}\Big[\big\lVert \epsilon - \epsilon_\theta\big(\sqrt{\bar\alpha_t}\,x_0 + \sqrt{1-\bar\alpha_t}\,\epsilon,\ t\big) \big\rVert^2\Big]
@@ -78,7 +80,7 @@ DDPM 的马尔可夫链只是满足这个条件的其中一种。DDIM 的做法�
 
 ### 4.1 公式
 
-对任意 $$s < t$$，DDIM 定义"已知 $$x_t$$ 和 $$x_0$$ 时 $$x_s$$ 的分布"为：
+对任意 $$s < t$$，DDIM 定义"已知 $$x_t$$ 和 $$x_0$$ 时 $$x_s$$ 的分布"为 [[1]](#ref-1)：
 
 $$
 q_\sigma(x_s \mid x_t, x_0) = \mathcal{N}\Big(
@@ -146,7 +148,7 @@ $$
 
 ## 5. 为什么跳了步结果还准
 
-第 4 节说明了 DDIM **允许**跳步。但跳一大步之后，结果为什么还和走完 300 步差不多？
+第 4 节说明了 DDIM **允许**跳步。但跳一大步之后，结果为什么还和走完 300 步差不多？ [[1]](#ref-1)
 
 ### 5.1 如果噪声预测是完美的，一步就够
 
@@ -311,7 +313,7 @@ def sample_ddim(model, shape, sched, device, num_steps=50, eta=0.0, x_T=None, cl
 
 ### 7.1 为什么可以反演
 
-$$\eta = 0$$ 时，DDIM 是一个确定的映射 $$x_T \mapsto x_0$$，而且它是在解一个 ODE（第 5.2 节）。ODE 可以反着积分，所以给定一张**真实图像** $$x_0$$，也能找到一个 $$x_T$$，让 DDIM 从这个 $$x_T$$ 出发恰好生成 $$x_0$$。这叫 **DDIM inversion**，是很多图像编辑方法的基础：先把真实图反演成噪声，改一改条件（例如换文字提示），再用 DDIM 生成回来。
+$$\eta = 0$$ 时，DDIM 是一个确定的映射 $$x_T \mapsto x_0$$，而且它是在解一个 ODE（第 5.2 节）。ODE 可以反着积分，所以给定一张**真实图像** $$x_0$$，也能找到一个 $$x_T$$，让 DDIM 从这个 $$x_T$$ 出发恰好生成 $$x_0$$。这叫 **DDIM inversion**，是很多图像编辑方法的基础：先把真实图反演成噪声，改一改条件（例如换文字提示），再用 DDIM 生成回来。 [[1]](#ref-1)
 
 更新公式和采样完全一样，只是方向反过来，从小的时间步 $$s$$ 走到大的时间步 $$t$$：
 
@@ -484,3 +486,9 @@ assert torch.equal(a, b) and torch.allclose(a, x0, atol=1e-4)
 - **DDPM 和 DDIM 是什么关系？** DDPM 是 DDIM 在 $$\eta = 1$$、$$s = t-1$$ 时的特例。
 - **DDIM 反演靠什么？** 确定性 ODE 可以反着积分。反演和生成要用同一组时间步和条件，$$w > 1$$ 的 CFG 会让反演变差。
 - **实现时最容易错的地方：** 时间步要 `round` 而且从 $$T-1$$ 开始；最后要跳到 $$\bar\alpha = 1$$；$$\sigma$$ 用 $$\bar\alpha_t/\bar\alpha_s$$；方向项用预测噪声而不是新噪声；根号里先 `clamp`；裁剪 $$\hat x_0$$ 后重新计算 $$\epsilon$$。
+
+## 参考资料
+
+- <a id="ref-1"></a>**[1] 主论文**：Song, Meng, Ermon. *Denoising Diffusion Implicit Models*. ICLR 2021. [arxiv.org/abs/2010.02502](https://arxiv.org/abs/2010.02502)。非马尔可夫的反向过程、$$\eta$$、跳步采样和反演都来自这篇（第 4 节和附录）。
+- <a id="ref-2"></a>**[2] 官方代码**：ermongroup/ddim [github.com/ermongroup/ddim](https://github.com/ermongroup/ddim)。PyTorch 实现，采样部分可以和第 6 节对照。
+- <a id="ref-3"></a>**[3] DDPM**：Ho, Jain, Abbeel. *Denoising Diffusion Probabilistic Models*. NeurIPS 2020. [arxiv.org/abs/2006.11239](https://arxiv.org/abs/2006.11239)。训练目标和记号，见 [DDPM 篇](/deep-learning/ddpm-from-scratch/)。

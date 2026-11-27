@@ -25,6 +25,8 @@ description: "How LoRA fine-tunes large models by training a low-rank update: ma
 
 LoRA（Low-Rank Adaptation，Hu 等人，ICLR 2022，论文 *LoRA: Low-Rank Adaptation of Large Language Models*）的做法是：**冻结原模型的全部权重，只给其中一些线性层旁边加一对很小的矩阵 $$B A$$，训练时只更新这对矩阵**。它最早用在 GPT-3 这样的大语言模型上，后来几乎成了 [Stable Diffusion](/deep-learning/stable-diffusion/) 社区里"定制风格、人物、概念"的标准方式：一个 LoRA 文件只有几 MB 到几百 MB，可以随时加载、调强度、和别的 LoRA 叠加。
 
+本文主要参考 LoRA 原论文 [[1]](#ref-1)；Stable Diffusion 上的用法参考 Diffusers 文档 [[3]](#ref-3)，两个应用分别来自 DreamBooth [[4]](#ref-4) 和 AnimateDiff [[5]](#ref-5)。正文里用 [n] 标出具体出处，完整列表见文末「参考资料」。
+
 ## 0. 全文路线
 
 | 节 | 内容 |
@@ -78,7 +80,7 @@ LoRA 的出发点是：能不能**并联**地加一个可训练分支，训完�
 
 ### 2.1 前向
 
-对一个线性层 $$h = W_0 x$$（$$W_0 \in \mathbb{R}^{d \times k}$$），LoRA 把它变成
+对一个线性层 $$h = W_0 x$$（$$W_0 \in \mathbb{R}^{d \times k}$$），LoRA 把它变成 [[1]](#ref-1)
 
 $$
 h = W_0 x + \Delta W x = W_0 x + \frac{\alpha}{r}\, B A x,
@@ -159,7 +161,7 @@ $$
 
 ### 2.5 低秩为什么够：论文的分析
 
-论文在 GPT-3 175B 上只给自注意力的 $$W_q$$、$$W_v$$ 加 LoRA（MLP 和其余层都冻结），观察到：
+论文在 GPT-3 175B 上只给自注意力的 $$W_q$$、$$W_v$$ 加 LoRA（MLP 和其余层都冻结），观察到 [[1]](#ref-1)：
 
 - **可训练参数减少约 10,000 倍，训练显存减少约 3 倍**（1.2 TB → 350 GB），每个任务的权重文件从 350 GB 降到约 35 MB，训练吞吐还提高了约 25%（大部分参数不需要算梯度）；在多个基准上和全量微调持平或更好。
 - **很小的 $$r$$ 就够了**：只适配 $$W_q$$、$$W_v$$ 时，$$r = 1$$ 或 2 的效果就已经很接近 $$r = 64$$。用不同 $$r$$ 学到的 $$\Delta W$$，最重要的几个奇异方向高度重合，再增加 $$r$$ 多出来的方向大多是噪声。
@@ -205,7 +207,7 @@ class LoRALinear(nn.Module):
 
 ### 3.2 卷积层
 
-扩散模型的 U-Net 里大部分是卷积。把一个 $$C_{\text{out}} \times C_{\text{in}} \times k_h \times k_w$$ 的卷积看成"输入是 $$C_{\text{in}} k_h k_w$$ 维的 patch、输出 $$C_{\text{out}}$$ 维"的线性层，LoRA 就自然推广过来：$$A$$ 是一个 $$k_h \times k_w$$ 的卷积，把 $$C_{\text{in}}$$ 降到 $$r$$；$$B$$ 是 $$1 \times 1$$ 卷积，把 $$r$$ 升到 $$C_{\text{out}}$$。社区里这种做法叫 LoCon。
+扩散模型的 U-Net 里大部分是卷积。把一个 $$C_{\text{out}} \times C_{\text{in}} \times k_h \times k_w$$ 的卷积看成"输入是 $$C_{\text{in}} k_h k_w$$ 维的 patch、输出 $$C_{\text{out}}$$ 维"的线性层，LoRA 就自然推广过来：$$A$$ 是一个 $$k_h \times k_w$$ 的卷积，把 $$C_{\text{in}}$$ 降到 $$r$$；$$B$$ 是 $$1 \times 1$$ 卷积，把 $$r$$ 升到 $$C_{\text{out}}$$。社区里这种做法叫 LoCon。 [[2]](#ref-2)
 
 ```python
 class LoRAConv2d(nn.Module):
@@ -416,7 +418,7 @@ print(sum(p.numel() for p in unet.parameters() if p.requires_grad))   # 797184
 
 ### 5.2 用 Diffusers 训练
 
-训练循环和 [SD 篇第 7 节](/deep-learning/stable-diffusion/)的完整微调完全一样，只有三处不同：U-Net 冻结后挂上 LoRA、优化器只放 LoRA 参数、只保存 LoRA 权重。Diffusers 通过 PEFT 库实现 LoRA：
+训练循环和 [SD 篇第 7 节](/deep-learning/stable-diffusion/)的完整微调完全一样，只有三处不同：U-Net 冻结后挂上 LoRA、优化器只放 LoRA 参数、只保存 LoRA 权重。Diffusers 通过 PEFT 库实现 LoRA [[3]](#ref-3)：
 
 ```python
 from peft import LoraConfig
@@ -484,7 +486,7 @@ LoRA 在图像生成里最常见的用途是**定制**：让模型学会一个�
 
 ### 6.1 DreamBooth 的做法
 
-只有 3～5 张某个对象的照片，怎么让模型学会它？
+只有 3～5 张某个对象的照片，怎么让模型学会它？ [[4]](#ref-4)
 
 1. **用一个稀有 token 当名字**：给所有训练图配同一句 prompt，例如 "a photo of **sks** dog"。`sks` 是一个模型几乎没有先验含义的 token，训练后它就"绑定"到这只狗上；后面的 "dog" 是类别词，让模型借用自己对"狗"的已有知识。
 2. **先验保留损失（prior preservation）**：只用这几张图训练，模型很快会出现**语言漂移**，即"dog"这个词本身也被带偏，所有狗都开始像这只狗，同时多样性下降。DreamBooth 的办法是：先用**原模型**按 "a photo of dog" 生成几百张"普通的狗"，训练时和实例图一起训：
@@ -578,7 +580,7 @@ def dreambooth_lora_step(unet, vae, text_encoder, batch, noise_scheduler, optimi
 
 ### 7.1 AnimateDiff：让已有的图像 LoRA 直接动起来
 
-AnimateDiff（Guo 等人，ICLR 2024）的出发点是：社区里已经有成千上万个基于 SD 1.5 的个性化模型（DreamBooth 模型和 LoRA），能不能**不重新训练它们**，就让它们生成视频？
+AnimateDiff（Guo 等人，ICLR 2024）的出发点是：社区里已经有成千上万个基于 SD 1.5 的个性化模型（DreamBooth 模型和 LoRA），能不能**不重新训练它们**，就让它们生成视频？ [[5]](#ref-5)
 
 它的做法是在**冻结的** SD 1.5 U-Net 的每个分辨率层里插入一个**运动模块**（motion module）：一组沿时间维做注意力的 Transformer 层。U-Net 原有的层逐帧处理（把帧数并到 batch 维），运动模块把同一空间位置在不同帧上的特征拿出来做 self-attention，负责"帧与帧之间怎么动"。运动模块在视频数据上训练一次，之后可以插到任何同源的个性化模型上。
 
@@ -623,7 +625,7 @@ AnimateDiff（Guo 等人，ICLR 2024）的出发点是：社区里已经有成�
 
 ### 7.2 MotionLoRA：用 LoRA 学一种镜头运动
 
-运动模块学的是"一般的运动"；想要特定的镜头运动（推近、拉远、左右平移、旋转），AnimateDiff 给运动模块的注意力层加 LoRA，**只用几十段同类镜头运动的视频**训练，就能学会这种运动模式。不同的 MotionLoRA 还可以按权重叠加，得到组合的镜头运动（例如边拉远边平移）。
+运动模块学的是"一般的运动"；想要特定的镜头运动（推近、拉远、左右平移、旋转），AnimateDiff 给运动模块的注意力层加 LoRA，**只用几十段同类镜头运动的视频**训练，就能学会这种运动模式。不同的 MotionLoRA 还可以按权重叠加，得到组合的镜头运动（例如边拉远边平移）。 [[5]](#ref-5)
 
 用 Diffusers 推理（运动模块叫 `MotionAdapter`，MotionLoRA 和图像 LoRA 用同一套 `load_lora_weights` / `set_adapters` 接口）：
 
@@ -725,7 +727,7 @@ def merge_loras_into(base_model_fn, loras, r=4, alpha=4.0):
 | **LoRA+**（2024） | $$B$$ 的学习率设得比 $$A$$ 大很多 | $$A$$、$$B$$ 用同一学习率时收敛偏慢 |
 | **LCM-LoRA**（2023） | 把"少步采样"能力蒸馏成一个 LoRA | 挂上后 SD 用 4～8 步就能出图，可以和风格 LoRA 叠加 |
 
-最后一行说明 LoRA 不只能学"内容"，也能学"采样行为"：任何能表示成一个小的权重增量的能力，都可以做成 LoRA 来分发和组合。
+最后一行说明 LoRA 不只能学"内容"，也能学"采样行为"：任何能表示成一个小的权重增量的能力，都可以做成 LoRA 来分发和组合。 [[6]](#ref-6)
 
 ### 9.2 要点回顾
 
@@ -736,3 +738,12 @@ def merge_loras_into(base_model_fn, loras, r=4, alpha=4.0):
 - 低秩之所以够用：微调主要是放大原模型已有但未被强调的方向，$$\Delta W$$ 的有效秩本来就很低。
 - 在 SD 里默认加在注意力的 q/k/v/out 上；$$r = 4$$ 只有约 80 万参数（U-Net 的 0.09%）。
 - 经典用法：DreamBooth 式的人物/物体定制（稀有 token + 先验保留）、风格 LoRA、视频里的 AnimateDiff（图像 LoRA 直接复用，MotionLoRA 学镜头运动）；多个 LoRA 可以按权重叠加。
+
+## 参考资料
+
+- <a id="ref-1"></a>**[1] 主论文**：Hu et al. *LoRA: Low-Rank Adaptation of Large Language Models*. ICLR 2022. [arxiv.org/abs/2106.09685](https://arxiv.org/abs/2106.09685)。公式、初始化、α/r 缩放、GPT-3 上的结果和第 2.5 节的低秩分析（论文第 7 节）。
+- <a id="ref-2"></a>**[2] 官方代码**：microsoft/LoRA [github.com/microsoft/LoRA](https://github.com/microsoft/LoRA)。`loralib`，第 3 节的实现可以和它对照。
+- <a id="ref-3"></a>**[3] Diffusers LoRA 训练文档**：Hugging Face Diffusers: LoRA [huggingface.co/docs/diffusers/en/training/lora](https://huggingface.co/docs/diffusers/en/training/lora)。第 5 节 SD 上的训练脚本和加载方式。
+- <a id="ref-4"></a>**[4] DreamBooth**：Ruiz et al. *DreamBooth: Fine Tuning Text-to-Image Diffusion Models for Subject-Driven Generation*. CVPR 2023. [arxiv.org/abs/2208.12242](https://arxiv.org/abs/2208.12242)。第 6 节的稀有 token 和先验保留损失。
+- <a id="ref-5"></a>**[5] AnimateDiff**：Guo et al. *AnimateDiff: Animate Your Personalized Text-to-Image Diffusion Models without Specific Tuning*. ICLR 2024. [arxiv.org/abs/2307.04725](https://arxiv.org/abs/2307.04725)。第 7 节的运动模块和 MotionLoRA；代码在 [guoyww/AnimateDiff](https://github.com/guoyww/AnimateDiff)。
+- <a id="ref-6"></a>**[6] QLoRA**：Dettmers et al. *QLoRA: Efficient Finetuning of Quantized LLMs*. NeurIPS 2023. [arxiv.org/abs/2305.14314](https://arxiv.org/abs/2305.14314)。第 9 节变体表里的第一行。
