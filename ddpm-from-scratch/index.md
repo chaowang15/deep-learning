@@ -30,6 +30,94 @@ description: "A complete DDPM implementation from scratch in PyTorch, formula by
 
 本文的公式和算法主要参考 DDPM 原论文 [[1]](#ref-1)，直观理解推荐 Lilian Weng 的博客 [[2]](#ref-2)；正文里用 [n] 标出具体出处，完整列表见文末「参考资料」。
 
+## 背景：扩散模型想解决什么问题
+
+这一节不写代码，只建立直觉、补齐后面要用到的几个基础知识。已经熟悉的读者可以直接跳到第 0 节。
+
+### 生成模型在做什么
+
+分类模型学的是"给一张图，输出它是什么"。**生成模型**反过来：看过大量真实图像之后，自己**画出新的、没见过但看起来同样真实**的图像。用概率的话说，训练集是从某个未知的分布 $$p_{\text{data}}(x)$$ 里抽出来的样本，生成模型要学会从这个分布里**采样**。
+
+难点在于这个分布极其复杂：一张 $$28 \times 28$$ 的灰度图就是 784 维空间里的一个点，"像衣服的图"只占这个空间里非常小、形状非常复杂的一块区域。直接写出它的概率密度几乎不可能。几类主流方法的思路是：
+
+| 方法 | 思路 | 优点 | 缺点 |
+|---|---|---|---|
+| [VAE](/deep-learning/generative-models-1-vae/) | 编码器把图压到一个简单的高斯 latent，解码器从 latent 还原 | 训练稳定，有明确的概率解释 | 生成结果偏模糊 |
+| [GAN](/deep-learning/generative-models-2-gan/) | 生成器和判别器对抗训练 | 生成清晰、采样一步完成 | 训练不稳定，容易模式崩溃（只会画少数几种） |
+| **扩散模型** | 把"一步生成"拆成很多个"去掉一点噪声"的小步 | 训练稳定（就是一个 MSE），质量和多样性都好 | 采样要走很多步，慢 |
+
+### 直觉：把"加噪"倒着放
+
+想象一滴墨水滴进清水：它会一点点扩散，最后整杯水变成均匀的淡灰色。这个过程很容易，但"从一杯均匀的灰水还原出那一滴墨水"看起来不可能。
+
+扩散模型的关键观察是：**如果每一步只扩散一点点，那么"往回退一小步"是可以学的**。对图像来说：
+
+<figure class="ddpm-fig">
+<svg viewBox="0 0 760 200" role="img" aria-label="前向加噪和反向去噪的马尔可夫链">
+  <defs><marker id="bgb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2a6fdb"/></marker>
+  <marker id="bgr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#d92d20"/></marker></defs>
+  <text x="380" y="38" text-anchor="middle" style="fill:#2a6fdb">前向过程 q：每步加一点高斯噪声（固定公式，不需要学习）</text>
+  <rect x="30" y="60" width="80" height="70" rx="8" fill="#ffffff" stroke="#475467"/><text x="70" y="90" text-anchor="middle">x<tspan baseline-shift="sub" font-size="10">0</tspan></text><text x="70" y="112" text-anchor="middle" class="sm">干净图像</text>
+  <rect x="150" y="60" width="80" height="70" rx="8" fill="#eef0f3" stroke="#475467"/><text x="190" y="90" text-anchor="middle">x<tspan baseline-shift="sub" font-size="10">1</tspan></text><text x="190" y="112" text-anchor="middle" class="sm">一点点噪声</text>
+  <rect x="270" y="60" width="80" height="70" rx="8" fill="#dde1e7" stroke="#475467"/><text x="310" y="90" text-anchor="middle">x<tspan baseline-shift="sub" font-size="10">2</tspan></text><text x="310" y="112" text-anchor="middle" class="sm">再多一点</text>
+  <text x="410" y="100" text-anchor="middle" style="font-size:20px">…</text>
+  <rect x="470" y="60" width="80" height="70" rx="8" fill="#b9c0ca" stroke="#475467"/><text x="510" y="90" text-anchor="middle">x<tspan baseline-shift="sub" font-size="10">T−1</tspan></text><text x="510" y="112" text-anchor="middle" class="sm">几乎全是噪声</text>
+  <rect x="620" y="60" width="80" height="70" rx="8" fill="#98a2b3" stroke="#475467"/><text x="660" y="90" text-anchor="middle">x<tspan baseline-shift="sub" font-size="10">T</tspan></text><text x="660" y="112" text-anchor="middle" class="sm" style="fill:#202124">纯噪声</text>
+  <line x1="110" y1="76" x2="148" y2="76" stroke="#2a6fdb" marker-end="url(#bgb)"/>
+  <line x1="230" y1="76" x2="268" y2="76" stroke="#2a6fdb" marker-end="url(#bgb)"/>
+  <line x1="350" y1="76" x2="386" y2="76" stroke="#2a6fdb" marker-end="url(#bgb)"/>
+  <line x1="434" y1="76" x2="468" y2="76" stroke="#2a6fdb" marker-end="url(#bgb)"/>
+  <line x1="550" y1="76" x2="618" y2="76" stroke="#2a6fdb" marker-end="url(#bgb)"/>
+  <line x1="148" y1="116" x2="112" y2="116" stroke="#d92d20" marker-end="url(#bgr)"/>
+  <line x1="268" y1="116" x2="232" y2="116" stroke="#d92d20" marker-end="url(#bgr)"/>
+  <line x1="386" y1="116" x2="352" y2="116" stroke="#d92d20" marker-end="url(#bgr)"/>
+  <line x1="468" y1="116" x2="434" y2="116" stroke="#d92d20" marker-end="url(#bgr)"/>
+  <line x1="618" y1="116" x2="552" y2="116" stroke="#d92d20" marker-end="url(#bgr)"/>
+  <text x="380" y="165" text-anchor="middle" style="fill:#d92d20">反向过程 p<tspan baseline-shift="sub" font-size="10">θ</tspan>：每步去掉一点噪声（由神经网络学习）</text>
+  <text x="380" y="187" text-anchor="middle" class="sm">训练：从 x₀ 出发造出各种带噪的 x<tspan baseline-shift="sub" font-size="9">t</tspan>，教网络认出里面的噪声；生成：从一张随机噪声 x<tspan baseline-shift="sub" font-size="9">T</tspan> 出发，一步步往左走</text>
+</svg>
+<figcaption>扩散模型的两条方向。上面一行（蓝）是人为设计的加噪过程，下面一行（红）是要学的去噪过程。</figcaption>
+</figure>
+
+- **前向过程**（蓝）：拿一张真实图像，一步步加一点高斯噪声，$$T$$ 步之后变成纯噪声。这一步完全由公式决定，**没有任何要学的参数**。
+- **反向过程**（红）：从纯噪声出发，一步步去掉一点噪声，最后得到一张图。每一步"去掉多少、去掉什么"由一个神经网络决定，这就是要训练的部分。
+
+训练好之后，生成一张新图只需要：随便抽一张高斯噪声 $$x_T$$，然后让网络一步步把它"洗"干净。因为起点是随机的，每次洗出来的都是一张不同的新图。
+
+### 需要的三个基础知识
+
+**① 高斯分布和"均值 + 标准差 × 标准噪声"。** $$\mathcal{N}(\mu, \sigma^2)$$ 表示均值 $$\mu$$、方差 $$\sigma^2$$ 的高斯分布。从它采样有一个非常常用的写法（VAE 里叫重参数化技巧）：
+
+$$
+x \sim \mathcal{N}(\mu, \sigma^2) \quad\Longleftrightarrow\quad x = \mu + \sigma\,\epsilon,\qquad \epsilon \sim \mathcal{N}(0, 1)
+$$
+
+也就是先抽一个标准高斯噪声 $$\epsilon$$，再缩放、平移。本文所有"加噪"的公式都写成这种形式，代码里就是 `mu + sigma * torch.randn_like(x)`。对图像来说，每个像素独立地这样做，记作 $$\mathcal{N}(\mu, \sigma^2 I)$$，$$I$$ 是单位矩阵，表示各像素互相独立、方差相同。
+
+**② 两个独立高斯相加，方差相加。** 若 $$a \sim \mathcal{N}(0, \sigma_1^2)$$、$$b \sim \mathcal{N}(0, \sigma_2^2)$$ 互相独立，则 $$a + b \sim \mathcal{N}(0, \sigma_1^2 + \sigma_2^2)$$。第 4 节能把"加 $$t$$ 次噪声"合并成"加 1 次噪声"，靠的就是这一条。可以用几行代码验证：
+
+```python
+import torch
+
+a = 0.6 * torch.randn(1_000_000)          # 标准差 0.6，方差 0.36
+b = 0.8 * torch.randn(1_000_000)          # 标准差 0.8，方差 0.64
+print((a + b).var())                       # 约 1.0 = 0.36 + 0.64
+```
+
+**③ 均方误差（MSE）。** $$\lVert y - \hat y \rVert^2$$，预测值和目标逐元素相减、平方、求平均，即 `F.mse_loss(pred, target)`。DDPM 的训练目标就是一个 MSE：网络预测的噪声和真实加进去的噪声之间的 MSE（第 6 节）。
+
+### 用一个像素走一遍
+
+在进入代码之前，先用一个像素的具体数字把训练和采样各走一遍（数字来自第 3 节 $$T = 300$$ 的调度表，第 $$t = 100$$ 步）：
+
+1. **加噪（训练时）。** 干净像素 $$x_0 = 0.6$$，抽到噪声 $$\epsilon = -1.2$$。第 100 步的两个系数是 $$\sqrt{\bar\alpha_{100}} = 0.844$$、$$\sqrt{1-\bar\alpha_{100}} = 0.537$$，所以带噪像素是
+   $$x_{100} = 0.844 \times 0.6 + 0.537 \times (-1.2) = -0.138$$。
+2. **网络预测（训练目标）。** 网络只看到 $$x_{100} = -0.138$$ 和"现在是第 100 步"，要猜出当初加的噪声 $$\epsilon = -1.2$$。假设它猜成 $$\hat\epsilon = -1.1$$，loss 就是 $$(-1.2 - (-1.1))^2 = 0.01$$。训练就是让这个误差在所有图像、所有像素、所有时间步上都尽量小。
+3. **反推干净图像。** 有了 $$\hat\epsilon$$，把第 1 步的公式反过来解：$$\hat x_0 = (x_{100} - 0.537 \times \hat\epsilon) / 0.844 = (-0.138 + 0.591) / 0.844 = 0.536$$，离真实的 0.6 已经不远。
+4. **往回走一步（采样时）。** DDPM 并不直接跳到 $$\hat x_0$$，而是只往回走一小步，得到 $$x_{99}$$ 的均值 $$\mu = -0.125$$，再加上一点新的随机噪声（标准差 $$\sigma_{100} = 0.081$$）。重复 100 次就回到 $$x_0$$。
+
+后面每一节都是在把这四步写成能处理整批图像的代码。
+
 ## 0. 全文路线
 
 DDPM 分成训练和采样两条线，共用同一张噪声调度表和同一个网络：
@@ -731,6 +819,21 @@ def sample_ddpm(model, shape, sched, device):
 
 这个小模型只训练了 4000 步，无条件样本能看出是衣服、鞋、包，但边缘和纹理还比较乱。加大网络、训练更久、加上 EMA 都会明显改善；下面第 9 节加上类别条件后效果也好很多。
 
+### 7.4 总结：训练和采样的完整流程
+
+到这里 DDPM 的全部部件都有了。把论文里的两个算法（Algorithm 1、2）[[1]](#ref-1) 和本文的函数对应起来：
+
+| | 训练（每个 batch 重复） | 采样（生成一批图） |
+|---|---|---|
+| 1 | 取一批真实图像 $$x_0$$，归一化到 $$[-1, 1]$$（`build_transform`） | 抽 $$x_T \sim \mathcal{N}(0, I)$$（`torch.randn(shape)`） |
+| 2 | 每张图抽一个 $$t \sim \operatorname{Uniform}\{1, \dots, T\}$$（`torch.randint`） | 对 $$t = T, T-1, \dots, 1$$ 循环（`for i in reversed(range(T))`） |
+| 3 | 抽 $$\epsilon \sim \mathcal{N}(0, I)$$，算 $$x_t = \sqrt{\bar\alpha_t}\,x_0 + \sqrt{1-\bar\alpha_t}\,\epsilon$$（`q_sample`） | 网络预测噪声 $$\hat\epsilon = \epsilon_\theta(x_t, t)$$ |
+| 4 | 网络预测 $$\hat\epsilon = \epsilon_\theta(x_t, t)$$（`model(xt, t)`） | 算均值 $$\mu_\theta = \frac{1}{\sqrt{\alpha_t}}\big(x_t - \frac{\beta_t}{\sqrt{1-\bar\alpha_t}}\hat\epsilon\big)$$ |
+| 5 | loss $$= \lVert \epsilon - \hat\epsilon \rVert^2$$，反向传播、更新参数（`ddpm_training_step`） | $$x_{t-1} = \mu_\theta + \sigma_t z$$，$$t = 1$$ 时不加噪声（`p_sample`） |
+| 6 | | 循环结束得到 $$x_0$$，反归一化后保存（`denormalize`） |
+
+两边共用的只有两样东西：第 3 节的调度表和第 5 节的网络。训练时网络每次只看**一个**随机时间步，采样时它被依次调用 $$T$$ 次；训练从不跑完整的链，采样必须跑完。
+
 ## 8. DDIM：少步采样
 
 ### 8.1 是什么、为什么
@@ -1032,6 +1135,7 @@ with torch.no_grad():
 ## 参考资料
 
 - <a id="ref-1"></a>**[1] 主论文**：Ho, Jain, Abbeel. *Denoising Diffusion Probabilistic Models*. NeurIPS 2020. [arxiv.org/abs/2006.11239](https://arxiv.org/abs/2006.11239)。前向加噪、预测噪声的训练目标、采样公式都来自这篇；官方代码（TensorFlow）在 [hojonathanho/diffusion](https://github.com/hojonathanho/diffusion)。
-- <a id="ref-2"></a>**[2] 写得很清楚的博客**：Lilian Weng. *What are Diffusion Models?* [lilianweng.github.io/posts/2021-07-11-diffusion-models/](https://lilianweng.github.io/posts/2021-07-11-diffusion-models/)。从前向过程推到训练目标的完整推导，公式细节不清楚时先看这篇。
+- <a id="ref-2"></a>**[2] 写得很清楚的博客（适合最先看）**：Lilian Weng. *What are Diffusion Models?* [lilianweng.github.io/posts/2021-07-11-diffusion-models/](https://lilianweng.github.io/posts/2021-07-11-diffusion-models/)。从前向过程推到训练目标的完整推导，公式细节不清楚时先看这篇。
 - <a id="ref-3"></a>**[3] CFG**：Ho, Salimans. *Classifier-Free Diffusion Guidance*. 2022. [arxiv.org/abs/2207.12598](https://arxiv.org/abs/2207.12598)。第 9 节的训练时丢标签、采样时两路预测外推。
 - <a id="ref-4"></a>**[4] v-prediction**：Salimans, Ho. *Progressive Distillation for Fast Sampling of Diffusion Models*. ICLR 2022. [arxiv.org/abs/2202.00512](https://arxiv.org/abs/2202.00512)。第 10 节的 v 参数化出自这篇。
+- <a id="ref-5"></a>**[5] 推导最完整的教程**：Calvin Luo. *Understanding Diffusion Models: A Unified Perspective*. 2022. [arxiv.org/abs/2208.11970](https://arxiv.org/abs/2208.11970)。从 VAE 讲到扩散模型，ELBO 每一步都写出来了，想把理论推一遍时看这篇；也可以看之前的笔记 [Diffusion Models 扩散模型学习](/deep-learning/diffusion-study/)。
