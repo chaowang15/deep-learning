@@ -20,19 +20,27 @@ description: "A complete DDPM implementation from scratch in PyTorch, formula by
 
 # DDPM 从零实现：从公式到代码
 
-目标是：**只看这一页，就能从公式出发，自己把一个能训练、能生成图像的 DDPM 一行行写出来**。每一部分都按同一个顺序讲：
+本文从公式出发，逐步实现一个可以训练、可以生成图像的 DDPM。每一部分按同样的顺序展开：
 
 1. 它是什么、为什么需要它，以及公式；
 2. 代码实现，变量名和公式符号一一对应；
-3. 易错点：公式写对了，代码也可能出错的地方。
+3. 易错点：公式正确、但实现时容易出错的地方。
 
-完整的理论推导（ELBO 等）见之前的笔记 [Diffusion Models 扩散模型学习](/deep-learning/diffusion-study/)，这里只推导写代码需要的部分。
+完整的理论推导（ELBO 等）见之前的笔记 [Diffusion Models 扩散模型学习](/deep-learning/diffusion-study/)，本文只推导实现所需的部分。
 
-本文的公式和算法主要参考 DDPM 原论文 [[1]](#ref-1)，直观理解推荐 Lilian Weng 的博客 [[2]](#ref-2)；正文里用 [n] 标出具体出处，完整列表见文末「参考资料」。
+## 参考资料
+
+本文的公式和算法主要参考 DDPM 原论文 [1]，直观理解推荐 Lilian Weng 的博客 [2]。正文中用 [n] 标注具体出处。
+
+- <a id="ref-1"></a>**[1] 主论文**：Ho, Jain, Abbeel. *Denoising Diffusion Probabilistic Models*. NeurIPS 2020. [arxiv.org/abs/2006.11239](https://arxiv.org/abs/2006.11239)。前向加噪、预测噪声的训练目标、采样公式都来自这篇；官方代码（TensorFlow）在 [hojonathanho/diffusion](https://github.com/hojonathanho/diffusion)。
+- <a id="ref-2"></a>**[2] 写得很清楚的博客（适合最先看）**：Lilian Weng. *What are Diffusion Models?* [lilianweng.github.io/posts/2021-07-11-diffusion-models/](https://lilianweng.github.io/posts/2021-07-11-diffusion-models/)。从前向过程推到训练目标的完整推导，公式细节不清楚时先看这篇。
+- <a id="ref-3"></a>**[3] CFG**：Ho, Salimans. *Classifier-Free Diffusion Guidance*. 2022. [arxiv.org/abs/2207.12598](https://arxiv.org/abs/2207.12598)。第 9 节的训练时丢标签、采样时两路预测外推。
+- <a id="ref-4"></a>**[4] v-prediction**：Salimans, Ho. *Progressive Distillation for Fast Sampling of Diffusion Models*. ICLR 2022. [arxiv.org/abs/2202.00512](https://arxiv.org/abs/2202.00512)。第 10 节的 v 参数化出自这篇。
+- <a id="ref-5"></a>**[5] 推导最完整的教程**：Calvin Luo. *Understanding Diffusion Models: A Unified Perspective*. 2022. [arxiv.org/abs/2208.11970](https://arxiv.org/abs/2208.11970)。从 VAE 讲到扩散模型，ELBO 每一步都写出来了，想把理论推一遍时看这篇；也可以看之前的笔记 [Diffusion Models 扩散模型学习](/deep-learning/diffusion-study/)。
 
 ## 背景：扩散模型想解决什么问题
 
-这一节不写代码，只建立直觉、补齐后面要用到的几个基础知识。已经熟悉的读者可以直接跳到第 0 节。
+本节介绍后文用到的基础知识和基本概念。熟悉这些内容的读者可以直接阅读第 0 节。
 
 ### 生成模型在做什么
 
@@ -46,9 +54,9 @@ description: "A complete DDPM implementation from scratch in PyTorch, formula by
 | [GAN](/deep-learning/generative-models-2-gan/) | 生成器和判别器对抗训练 | 生成清晰、采样一步完成 | 训练不稳定，容易模式崩溃（只会画少数几种） |
 | **扩散模型** | 把"一步生成"拆成很多个"去掉一点噪声"的小步 | 训练稳定（就是一个 MSE），质量和多样性都好 | 采样要走很多步，慢 |
 
-### 直觉：把"加噪"倒着放
+### 基本思想：把"加噪"反过来
 
-想象一滴墨水滴进清水：它会一点点扩散，最后整杯水变成均匀的淡灰色。这个过程很容易，但"从一杯均匀的灰水还原出那一滴墨水"看起来不可能。
+以一滴墨水滴入清水为例：它会一点点扩散，最后整杯水变成均匀的淡灰色。这个过程很容易，但"从一杯均匀的灰水还原出那一滴墨水"看起来不可能。
 
 扩散模型的关键观察是：**如果每一步只扩散一点点，那么"往回退一小步"是可以学的**。对图像来说：
 
@@ -82,7 +90,7 @@ description: "A complete DDPM implementation from scratch in PyTorch, formula by
 - **前向过程**（蓝）：拿一张真实图像，一步步加一点高斯噪声，$$T$$ 步之后变成纯噪声。这一步完全由公式决定，**没有任何要学的参数**。
 - **反向过程**（红）：从纯噪声出发，一步步去掉一点噪声，最后得到一张图。每一步"去掉多少、去掉什么"由一个神经网络决定，这就是要训练的部分。
 
-训练好之后，生成一张新图只需要：随便抽一张高斯噪声 $$x_T$$，然后让网络一步步把它"洗"干净。因为起点是随机的，每次洗出来的都是一张不同的新图。
+训练完成后，生成新图像只需要：随机采样一张高斯噪声 $$x_T$$，再由网络逐步去除其中的噪声。由于起点是随机的，每次得到的都是一张不同的新图像。
 
 ### 需要的三个基础知识
 
@@ -106,9 +114,9 @@ print((a + b).var())                       # 约 1.0 = 0.36 + 0.64
 
 **③ 均方误差（MSE）。** $$\lVert y - \hat y \rVert^2$$，预测值和目标逐元素相减、平方、求平均，即 `F.mse_loss(pred, target)`。DDPM 的训练目标就是一个 MSE：网络预测的噪声和真实加进去的噪声之间的 MSE（第 6 节）。
 
-### 用一个像素走一遍
+### 数值示例：一个像素的训练和采样
 
-在进入代码之前，先用一个像素的具体数字把训练和采样各走一遍（数字来自第 3 节 $$T = 300$$ 的调度表，第 $$t = 100$$ 步）：
+在进入代码之前，先用一个像素的具体数值演示训练和采样各一步（数字来自第 3 节 $$T = 300$$ 的调度表，第 $$t = 100$$ 步）：
 
 1. **加噪（训练时）。** 干净像素 $$x_0 = 0.6$$，抽到噪声 $$\epsilon = -1.2$$。第 100 步的两个系数是 $$\sqrt{\bar\alpha_{100}} = 0.844$$、$$\sqrt{1-\bar\alpha_{100}} = 0.537$$，所以带噪像素是
    $$x_{100} = 0.844 \times 0.6 + 0.537 \times (-1.2) = -0.138$$。
@@ -116,7 +124,7 @@ print((a + b).var())                       # 约 1.0 = 0.36 + 0.64
 3. **反推干净图像。** 有了 $$\hat\epsilon$$，把第 1 步的公式反过来解：$$\hat x_0 = (x_{100} - 0.537 \times \hat\epsilon) / 0.844 = (-0.138 + 0.591) / 0.844 = 0.536$$，离真实的 0.6 已经不远。
 4. **往回走一步（采样时）。** DDPM 并不直接跳到 $$\hat x_0$$，而是只往回走一小步，得到 $$x_{99}$$ 的均值 $$\mu = -0.125$$，再加上一点新的随机噪声（标准差 $$\sigma_{100} = 0.081$$）。重复 100 次就回到 $$x_0$$。
 
-后面每一节都是在把这四步写成能处理整批图像的代码。
+后文各节将这四步实现为可以处理整批图像的代码。
 
 ## 0. 全文路线
 
@@ -149,7 +157,7 @@ DDPM 分成训练和采样两条线，共用同一张噪声调度表和同一个
 
 其中 $$B$$ 是 batch 大小，$$C, H, W$$ 是通道数和图像尺寸（灰度 28×28 时为 `1, 28, 28`，RGB 32×32 时为 `3, 32, 32`）。
 
-**下标约定是第一个坑**：论文里 $$t$$ 从 1 数到 $$T$$，$$x_0$$ 是干净图像；代码里所有表都是长度 $$T$$ 的数组，下标从 0 开始。所以**代码里的 `t` 永远比论文的 $$t$$ 小 1**：`alpha_bars[0]` 是 $$\bar\alpha_1$$，`alpha_bars[T-1]` 是 $$\bar\alpha_T$$。干净图像 $$x_0$$ 在表里没有对应项，它的"$$\bar\alpha_0 = 1$$"只出现在 `alpha_bars_prev` 里。
+**首先要注意下标约定**：论文里 $$t$$ 从 1 数到 $$T$$，$$x_0$$ 是干净图像；代码里所有表都是长度 $$T$$ 的数组，下标从 0 开始。所以**代码里的 `t` 永远比论文的 $$t$$ 小 1**：`alpha_bars[0]` 是 $$\bar\alpha_1$$，`alpha_bars[T-1]` 是 $$\bar\alpha_T$$。干净图像 $$x_0$$ 在表里没有对应项，它的"$$\bar\alpha_0 = 1$$"只出现在 `alpha_bars_prev` 里。
 
 <figure class="ddpm-fig">
 <svg viewBox="0 0 760 330" role="img" aria-label="数据归一化、噪声调度和前向加噪之间的数据流">
@@ -341,7 +349,7 @@ q(x_t \mid x_{t-1}) = \mathcal{N}\big(x_t;\ \sqrt{\alpha_t}\,x_{t-1},\ \beta_t I
 x_t = \sqrt{\alpha_t}\,x_{t-1} + \sqrt{1-\alpha_t}\,\epsilon_{t-1}
 $$
 
-如果真的一步步加，训练时每取一个样本都要循环 $$t$$ 次，太慢。好在高斯噪声可以合并。展开两步：
+如果逐步加噪，训练时每取一个样本都要循环 $$t$$ 次，太慢。好在高斯噪声可以合并。展开两步：
 
 $$
 x_t = \sqrt{\alpha_t\alpha_{t-1}}\,x_{t-2} + \underbrace{\sqrt{\alpha_t(1-\alpha_{t-1})}\,\epsilon_{t-2} + \sqrt{1-\alpha_t}\,\epsilon_{t-1}}_{\text{两个独立高斯之和，方差 } \alpha_t(1-\alpha_{t-1}) + (1-\alpha_t) \,=\, 1-\alpha_t\alpha_{t-1}}
@@ -1131,11 +1139,3 @@ with torch.no_grad():
 - **DDIM 为什么能跳步？** 它和 DDPM 共用同一个训练好的网络，只是换了一个非马尔可夫的反向过程：先估计 $$\hat x_0$$，再直接跳到任意更早的时间步。$$\eta = 0$$ 时完全确定，同一个初始噪声总是得到同一张图。
 - **CFG 的代价是什么？** 训练时只需以 10% 的概率把标签换成空类别；采样时每步要算两次网络（有条件、无条件），速度减半，换来更强的类别一致性。
 - **$$\epsilon$$、$$x_0$$、$$v$$ 选哪个？** 三者可以互相换算，采样器的后半段共用。差别在于网络误差传到 $$\hat x_0$$ 时放大多少：$$\epsilon$$ 在高噪声端放大 $$1/\sqrt{\bar\alpha_t}$$ 倍，$$v$$ 永远不放大。
-
-## 参考资料
-
-- <a id="ref-1"></a>**[1] 主论文**：Ho, Jain, Abbeel. *Denoising Diffusion Probabilistic Models*. NeurIPS 2020. [arxiv.org/abs/2006.11239](https://arxiv.org/abs/2006.11239)。前向加噪、预测噪声的训练目标、采样公式都来自这篇；官方代码（TensorFlow）在 [hojonathanho/diffusion](https://github.com/hojonathanho/diffusion)。
-- <a id="ref-2"></a>**[2] 写得很清楚的博客（适合最先看）**：Lilian Weng. *What are Diffusion Models?* [lilianweng.github.io/posts/2021-07-11-diffusion-models/](https://lilianweng.github.io/posts/2021-07-11-diffusion-models/)。从前向过程推到训练目标的完整推导，公式细节不清楚时先看这篇。
-- <a id="ref-3"></a>**[3] CFG**：Ho, Salimans. *Classifier-Free Diffusion Guidance*. 2022. [arxiv.org/abs/2207.12598](https://arxiv.org/abs/2207.12598)。第 9 节的训练时丢标签、采样时两路预测外推。
-- <a id="ref-4"></a>**[4] v-prediction**：Salimans, Ho. *Progressive Distillation for Fast Sampling of Diffusion Models*. ICLR 2022. [arxiv.org/abs/2202.00512](https://arxiv.org/abs/2202.00512)。第 10 节的 v 参数化出自这篇。
-- <a id="ref-5"></a>**[5] 推导最完整的教程**：Calvin Luo. *Understanding Diffusion Models: A Unified Perspective*. 2022. [arxiv.org/abs/2208.11970](https://arxiv.org/abs/2208.11970)。从 VAE 讲到扩散模型，ELBO 每一步都写出来了，想把理论推一遍时看这篇；也可以看之前的笔记 [Diffusion Models 扩散模型学习](/deep-learning/diffusion-study/)。

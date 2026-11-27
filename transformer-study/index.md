@@ -92,7 +92,7 @@ embedded_sentence = embed(sentence_int).detach()
 
 ### 1.4 RNN流程和细节
 
-Okay 现在就可以总结回顾一下 RNN 模型的流程了（LSTM本质上和RNN是类似的，只是增加了多个gates操作使得对历史记忆能力提升了，框架不变）。首先直接上动图。
+下面总结 RNN 模型的流程（LSTM本质上和RNN是类似的，只是增加了多个gates操作使得对历史记忆能力提升了，框架不变）。首先看动图。
 
 ![RNN_1.gif](/deep-learning/assets/transformer-study/RNN_1.gif)
 
@@ -303,7 +303,7 @@ embedded_sentence = embed(sentence_int).detach() # 6x16 array
 
 **官方实现**
 
-参考 Ref [7] 的官方代码。实现其实不难了。
+实现参考 Ref [7] 的代码。
 
 ```python
 class Embeddings(nn.Module):
@@ -523,7 +523,7 @@ def attention(query, key, value, mask=None, dropout=None):
 
 ### 3.5 Multi-Headed Attention 多头注意力机制
 
-Multi-Headed Attention 其实就是上面的 Single Head 的扩展，它就相当于是 Single Head attention 的多个 copy  而已，相互的 head 之间甚至没啥联系，即每个 head 有自己单独的query, key, value矩阵（这和RNN那种稍微复杂一点的多层还不一样，后者是层之间有联系的)。**出发点是,每个 Head 会学到不同类别的关联信息**。流程是下左图。
+Multi-Headed Attention 其实就是上面的 Single Head 的扩展，相当于 Single Head attention 的多个副本，各个 head 之间相互独立，即每个 head 有自己单独的query, key, value矩阵（这和RNN那种稍微复杂一点的多层还不一样，后者是层之间有联系的)。**出发点是,每个 Head 会学到不同类别的关联信息**。流程是下左图。
 
 多头注意力机制其实就完全是使用了 $h$ 个 Self Attention 并行而已， $h$  **is number of heads，**没有其他特别之处。如下左图的 two-headed attention。当然，因为维度升高了一维，即多了一个 h，因此实现上稍有区别。另外，当Attention计算完成后，需要将全部 heads 的结果给再次合并 concatenate 起来，最后再经过一层 Linear，如下面右图。
 

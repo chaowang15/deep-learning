@@ -21,19 +21,25 @@ description: "Why DDIM can sample in a few dozen steps with an unchanged DDPM mo
 
 上一篇 [DDPM 从零实现](/deep-learning/ddpm-from-scratch/) 训练好的模型，用 DDPM 采样一张图要走 $$T = 300$$ 步，也就是调用 300 次网络。DDIM（Denoising Diffusion Implicit Models）**不改模型、不重新训练**，只换一个采样器，就能用 20～50 步得到几乎一样的结果。
 
-这一篇回答三个问题：
+本文围绕三个问题展开：
 
 1. **为什么可以跳步？** 关键在于：DDPM 的训练只用到了边缘分布 $$q(x_t \mid x_0)$$。
-2. **为什么跳了步结果还准？** 确定性的 DDIM 其实是在用 Euler 法解一个平滑的 ODE，步长可以很大。
+2. **为什么跳了步结果还准？** 确定性的 DDIM 等价于用 Euler 法求解一个平滑的 ODE，步长可以很大。
 3. **具体怎么实现？** 给出时间步选择、单步更新、完整采样循环和 DDIM 反演的代码，变量名和公式一一对应，并列出易错点。
 
 最后用上一篇在 FashionMNIST 上训练的同一个模型做实验，所有图都是真实运行结果。
 
-本文主要参考 DDIM 原论文 [[1]](#ref-1)；它建立在 DDPM [[3]](#ref-3) 之上。正文里用 [n] 标出具体出处，完整列表见文末「参考资料」。
+## 参考资料
+
+本文主要参考 DDIM 原论文 [1]；它建立在 DDPM [3] 之上。正文中用 [n] 标注具体出处。
+
+- <a id="ref-1"></a>**[1] 主论文**：Song, Meng, Ermon. *Denoising Diffusion Implicit Models*. ICLR 2021. [arxiv.org/abs/2010.02502](https://arxiv.org/abs/2010.02502)。非马尔可夫的反向过程、$$\eta$$、跳步采样和反演都来自这篇（第 4 节和附录）。
+- <a id="ref-2"></a>**[2] 官方代码**：ermongroup/ddim [github.com/ermongroup/ddim](https://github.com/ermongroup/ddim)。PyTorch 实现，采样部分可以和第 6 节对照。
+- <a id="ref-3"></a>**[3] DDPM**：Ho, Jain, Abbeel. *Denoising Diffusion Probabilistic Models*. NeurIPS 2020. [arxiv.org/abs/2006.11239](https://arxiv.org/abs/2006.11239)。训练目标和记号，见 [DDPM 篇](/deep-learning/ddpm-from-scratch/)。
 
 ## 背景与预备知识
 
-这一节补齐读后面需要的东西：从上一篇带过来的三个公式，以及两个概念（马尔可夫链与边缘分布、ODE 与 Euler 法）。已经熟悉的读者可以直接跳到第 1 节。
+本节介绍后文用到的基础知识：从上一篇带过来的三个公式，以及两个概念（马尔可夫链与边缘分布、ODE 与 Euler 法）。熟悉这些内容的读者可以直接阅读第 1 节。
 
 ### 从 DDPM 带过来的三个公式
 
@@ -45,7 +51,7 @@ DDIM 完全复用 DDPM 训练好的网络 $$\epsilon_\theta(x_t, t)$$ 和同一�
 | $$\hat x_0 = \big(x_t - \sqrt{1-\bar\alpha_t}\,\epsilon_\theta(x_t, t)\big) / \sqrt{\bar\alpha_t}$$ | 用网络预测的噪声反推干净图像 | 第 7 节 |
 | $$x_{t-1} = \mu_\theta(x_t, t) + \sigma_t z$$ | DDPM 的反向一步，每次只能退一步 | 第 7 节 |
 
-第一行是理解 DDIM 的钥匙：$$x_t$$ 只由"一张干净图"和"一份噪声"按比例混合而成，比例只取决于 $$t$$。
+第一行是理解 DDIM 的关键：$$x_t$$ 只由"一张干净图"和"一份噪声"按比例混合而成，比例只取决于 $$t$$。
 
 ### 马尔可夫链和边缘分布
 
@@ -53,7 +59,7 @@ DDIM 完全复用 DDPM 训练好的网络 $$\epsilon_\theta(x_t, t)$$ 和同一�
 
 **边缘分布**：不管中间怎么走，只看"第 $$t$$ 步的 $$x_t$$ 长什么样"。DDPM 里它就是第一行公式 $$q(x_t \mid x_0) = \mathcal{N}(\sqrt{\bar\alpha_t}\,x_0, (1-\bar\alpha_t) I)$$。
 
-打个比方：从一楼走到十楼，"每次只能上一层"是一种走法（马尔可夫链），"坐电梯直达"是另一种走法；但只要每一层楼的位置一样（边缘分布相同），站在第 7 层看到的风景就是一样的。第 3 节会看到，DDPM 训练时只看过"每一层的风景"，从没要求"必须一层一层走"，DDIM 就利用这一点换成了能直达的走法。
+类比来说：从一楼走到十楼，"每次只能上一层"是一种走法（马尔可夫链），"坐电梯直达"是另一种走法；但只要每一层楼的位置一样（边缘分布相同），站在第 7 层看到的风景就是一样的。第 3 节会看到，DDPM 训练时只看过"每一层的风景"，从没要求"必须一层一层走"，DDIM 就利用这一点换成了能直达的走法。
 
 ### ODE 和 Euler 法
 
@@ -79,9 +85,9 @@ print(euler(1), euler(10), euler(100))   # 0.0  0.3487  0.3660，步数越多越
 
 两个要点后面会用到：**步长越大误差越大**（误差大致和步长成正比）；**轨迹越平滑，大步长也越准**。第 5 节会说明确定性的 DDIM 正是在用 Euler 法解一个关于去噪的 ODE，网络预测的噪声就是斜率，"跳步"就是"大步长"。
 
-### 用一个像素跳一大步
+### 数值示例：一个像素的跳步
 
-和 DDPM 篇一样，用一个像素的具体数字看 DDIM 的一步（$$T = 300$$ 的调度表；第 4 节会推导公式）：
+与 DDPM 篇相同，用一个像素的具体数值演示 DDIM 的一步（$$T = 300$$ 的调度表；第 4 节会推导公式）：
 
 1. 干净像素 $$x_0 = 0.6$$、噪声 $$\epsilon = -1.2$$，在 $$t = 300$$ 时 $$\sqrt{\bar\alpha_{300}} = 0.219$$、$$\sqrt{1-\bar\alpha_{300}} = 0.976$$，所以 $$x_{300} = 0.219 \times 0.6 + 0.976 \times (-1.2) = -1.039$$。
 2. 网络预测噪声 $$\hat\epsilon = -1.15$$（只差 0.05），反推 $$\hat x_0 = (-1.039 - 0.976 \times (-1.15)) / 0.219 = 0.378$$。噪声只猜错 0.05，干净像素却差了 0.22：高噪声时误差被放大了 $$0.976 / 0.219 \approx 4.5$$ 倍。
@@ -145,7 +151,7 @@ q_\sigma(x_s \mid x_t, x_0) = \mathcal{N}\Big(
 \sigma_{t\to s}^2 I\Big)
 $$
 
-看起来复杂，其实可以一句话读懂：$$\frac{x_t - \sqrt{\bar\alpha_t}\,x_0}{\sqrt{1-\bar\alpha_t}}$$ 正好就是 $$x_t$$ 里的那份噪声 $$\epsilon$$。所以这个分布的意思是：
+这个式子可以这样理解：$$\frac{x_t - \sqrt{\bar\alpha_t}\,x_0}{\sqrt{1-\bar\alpha_t}}$$ 正好就是 $$x_t$$ 里的那份噪声 $$\epsilon$$。所以这个分布的意思是：
 
 $$
 x_s = \sqrt{\bar\alpha_s}\,x_0 \;+\; \sqrt{1-\bar\alpha_s-\sigma_{t\to s}^2}\;\epsilon \;+\; \sigma_{t\to s}\,z
@@ -556,9 +562,3 @@ assert torch.equal(a, b) and torch.allclose(a, x0, atol=1e-4)
 - **DDPM 和 DDIM 是什么关系？** DDPM 是 DDIM 在 $$\eta = 1$$、$$s = t-1$$ 时的特例。
 - **DDIM 反演靠什么？** 确定性 ODE 可以反着积分。反演和生成要用同一组时间步和条件，$$w > 1$$ 的 CFG 会让反演变差。
 - **实现时最容易错的地方：** 时间步要 `round` 而且从 $$T-1$$ 开始；最后要跳到 $$\bar\alpha = 1$$；$$\sigma$$ 用 $$\bar\alpha_t/\bar\alpha_s$$；方向项用预测噪声而不是新噪声；根号里先 `clamp`；裁剪 $$\hat x_0$$ 后重新计算 $$\epsilon$$。
-
-## 参考资料
-
-- <a id="ref-1"></a>**[1] 主论文**：Song, Meng, Ermon. *Denoising Diffusion Implicit Models*. ICLR 2021. [arxiv.org/abs/2010.02502](https://arxiv.org/abs/2010.02502)。非马尔可夫的反向过程、$$\eta$$、跳步采样和反演都来自这篇（第 4 节和附录）。
-- <a id="ref-2"></a>**[2] 官方代码**：ermongroup/ddim [github.com/ermongroup/ddim](https://github.com/ermongroup/ddim)。PyTorch 实现，采样部分可以和第 6 节对照。
-- <a id="ref-3"></a>**[3] DDPM**：Ho, Jain, Abbeel. *Denoising Diffusion Probabilistic Models*. NeurIPS 2020. [arxiv.org/abs/2006.11239](https://arxiv.org/abs/2006.11239)。训练目标和记号，见 [DDPM 篇](/deep-learning/ddpm-from-scratch/)。

@@ -30,7 +30,14 @@ description: "How IP-Adapter lets Stable Diffusion take an image as a prompt: CL
 
 训练完的 IP-Adapter 可以挂在同一底模的各种微调版本上，也可以和文本提示、ControlNet、T2I-Adapter 同时使用。
 
-本文主要参考 IP-Adapter 原论文 [[1]](#ref-1) 和官方仓库 [[2]](#ref-2)，Diffusers 的用法参考 [[3]](#ref-3)。正文里用 [n] 标出具体出处，完整列表见文末「参考资料」。
+## 参考资料
+
+本文主要参考 IP-Adapter 原论文 [1] 和官方仓库 [2]，Diffusers 的用法参考 [3]。正文中用 [n] 标注具体出处。
+
+- <a id="ref-1"></a>**[1] 主论文**：Ye et al. *IP-Adapter: Text Compatible Image Prompt Adapter for Text-to-Image Diffusion Models*. 2023. [arxiv.org/abs/2308.06721](https://arxiv.org/abs/2308.06721)。解耦 cross-attention、图像投影、训练数据和丢弃比例都来自这篇（第 3、4 节）。
+- <a id="ref-2"></a>**[2] 官方仓库**：tencent-ailab/IP-Adapter [github.com/tencent-ailab/IP-Adapter](https://github.com/tencent-ailab/IP-Adapter)。训练脚本、Plus / FaceID 等变体的实现。
+- <a id="ref-3"></a>**[3] Diffusers 文档**：Hugging Face Diffusers: IP-Adapter [huggingface.co/docs/diffusers/en/using-diffusers/ip_adapter](https://huggingface.co/docs/diffusers/en/using-diffusers/ip_adapter)。第 6 节的加载、调强度、缓存嵌入。
+- <a id="ref-4"></a>**[4] 权重**：h94/IP-Adapter [huggingface.co/h94/IP-Adapter](https://huggingface.co/h94/IP-Adapter)。第 6.4 节列出的各个权重文件。
 
 ## 0. 全文路线
 
@@ -514,10 +521,3 @@ FaceID 系列在单独的仓库里，需要额外的人脸识别模型和 LoRA�
 - SD 1.5 上只训练 2232 万参数；$$\lambda = 0$$ 精确退回原模型，但初始化不是零，$$\lambda = 1$$ 从第一步就有影响。
 - 训练用参考图 = 目标图，文本、图像、两者各以 0.05 的概率丢弃，丢图像就是把嵌入置零，推理时 CFG 的负分支同样用全零嵌入。
 - 推理时 λ 越大越像参考图、越不听文本；和 ControlNet / T2I-Adapter 作用在不同位置，可以直接组合成"参考图的外观 + 条件图的结构"。
-
-## 参考资料
-
-- <a id="ref-1"></a>**[1] 主论文**：Ye et al. *IP-Adapter: Text Compatible Image Prompt Adapter for Text-to-Image Diffusion Models*. 2023. [arxiv.org/abs/2308.06721](https://arxiv.org/abs/2308.06721)。解耦 cross-attention、图像投影、训练数据和丢弃比例都来自这篇（第 3、4 节）。
-- <a id="ref-2"></a>**[2] 官方仓库**：tencent-ailab/IP-Adapter [github.com/tencent-ailab/IP-Adapter](https://github.com/tencent-ailab/IP-Adapter)。训练脚本、Plus / FaceID 等变体的实现。
-- <a id="ref-3"></a>**[3] Diffusers 文档**：Hugging Face Diffusers: IP-Adapter [huggingface.co/docs/diffusers/en/using-diffusers/ip_adapter](https://huggingface.co/docs/diffusers/en/using-diffusers/ip_adapter)。第 6 节的加载、调强度、缓存嵌入。
-- <a id="ref-4"></a>**[4] 权重**：h94/IP-Adapter [huggingface.co/h94/IP-Adapter](https://huggingface.co/h94/IP-Adapter)。第 6.4 节列出的各个权重文件。

@@ -30,9 +30,16 @@ description: "Why latent diffusion runs DDPM inside an autoencoder's latent spac
 2. 冻结它，然后**在 latent 空间里做完全标准的 DDPM**；
 3. 生成时在 latent 里去噪，最后用解码器解码一次得到图像。
 
-扩散的公式、训练目标、采样器一个都没改，改的只是"在哪个空间里扩散"。[Stable Diffusion](/deep-learning/stable-diffusion/) 就是这篇论文的放大版。本文把论文的思路、结构图、两阶段训练的细节都补齐，再用一个能在 CPU 上跑的 Tiny LDM 实际训练一遍。
+扩散的公式、训练目标、采样器一个都没改，改的只是"在哪个空间里扩散"。[Stable Diffusion](/deep-learning/stable-diffusion/) 就是这篇论文的放大版。本文介绍论文的思路、结构图和两阶段训练的细节，并在 CPU 上训练一个 Tiny LDM 作为实验。
 
-本文主要参考 LDM 原论文 [[1]](#ref-1) 和官方仓库 [[2]](#ref-2)；自编码器的训练方式来自 VQGAN [[3]](#ref-3)。正文里用 [n] 标出具体出处，完整列表见文末「参考资料」。
+## 参考资料
+
+本文主要参考 LDM 原论文 [1] 和官方仓库 [2]；自编码器的训练方式来自 VQGAN [3]。正文中用 [n] 标注具体出处。
+
+- <a id="ref-1"></a>**[1] 主论文**：Rombach et al. *High-Resolution Image Synthesis with Latent Diffusion Models*. CVPR 2022. [arxiv.org/abs/2112.10752](https://arxiv.org/abs/2112.10752)。结构图（论文图 3）、压缩倍数 f 的实验、两种正则、条件机制都来自这篇及其附录。
+- <a id="ref-2"></a>**[2] 官方仓库**：CompVis/latent-diffusion [github.com/CompVis/latent-diffusion](https://github.com/CompVis/latent-diffusion)。自编码器和 LDM 的配置、损失函数实现。
+- <a id="ref-3"></a>**[3] VQGAN**：Esser, Rombach, Ommer. *Taming Transformers for High-Resolution Image Synthesis*. CVPR 2021. [arxiv.org/abs/2012.09841](https://arxiv.org/abs/2012.09841)。第 3 节 L1 + LPIPS + PatchGAN 的自编码器训练方式。
+- <a id="ref-4"></a>**[4] LPIPS**：Zhang et al. *The Unreasonable Effectiveness of Deep Features as a Perceptual Metric*. CVPR 2018. [arxiv.org/abs/1801.03924](https://arxiv.org/abs/1801.03924)。感知损失。
 
 ## 0. 全文路线
 
@@ -692,7 +699,7 @@ LDM 的整条链路是 $$x \to z \to \tilde x$$。即使扩散模型完美地生
 - 很小的文字、远处的人脸、手指这类细节容易在 $$f = 8$$ 的压缩里丢掉；
 - 高频纹理变软、局部颜色偏移、自编码器特有的伪影。
 
-一句话：**像素空间扩散直接建模每个像素，但贵；latent 扩散用一点重建保真度，换来大得多的效率和可扩展性。**
+总结：**像素空间扩散直接建模每个像素，但贵；latent 扩散用一点重建保真度，换来大得多的效率和可扩展性。**
 
 ### 9.2 后来的发展
 
@@ -710,10 +717,3 @@ LDM 的整条链路是 $$x \to z \to \tilde x$$。即使扩散模型完美地生
 - 条件两种接法：$$\tau_\theta$$ + cross-attention（文本、类别），或者直接拼到输入（分割图、低分辨率图、修补）。
 - 训练要用编码器（或缓存的 latent），文生图推理只要解码器，且只跑一次。
 - 代价是自编码器的重建上限：细小文字、人脸、手是 latent 扩散的老问题。
-
-## 参考资料
-
-- <a id="ref-1"></a>**[1] 主论文**：Rombach et al. *High-Resolution Image Synthesis with Latent Diffusion Models*. CVPR 2022. [arxiv.org/abs/2112.10752](https://arxiv.org/abs/2112.10752)。结构图（论文图 3）、压缩倍数 f 的实验、两种正则、条件机制都来自这篇及其附录。
-- <a id="ref-2"></a>**[2] 官方仓库**：CompVis/latent-diffusion [github.com/CompVis/latent-diffusion](https://github.com/CompVis/latent-diffusion)。自编码器和 LDM 的配置、损失函数实现。
-- <a id="ref-3"></a>**[3] VQGAN**：Esser, Rombach, Ommer. *Taming Transformers for High-Resolution Image Synthesis*. CVPR 2021. [arxiv.org/abs/2012.09841](https://arxiv.org/abs/2012.09841)。第 3 节 L1 + LPIPS + PatchGAN 的自编码器训练方式。
-- <a id="ref-4"></a>**[4] LPIPS**：Zhang et al. *The Unreasonable Effectiveness of Deep Features as a Perceptual Metric*. CVPR 2018. [arxiv.org/abs/1801.03924](https://arxiv.org/abs/1801.03924)。感知损失。
