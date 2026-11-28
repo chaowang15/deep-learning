@@ -1,12 +1,66 @@
 (function () {
-  const themeToggle = document.querySelector("[data-theme-toggle]");
-  if (themeToggle) {
-    themeToggle.addEventListener("click", () => {
-      const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
-      document.documentElement.setAttribute("data-theme", next);
-      try {
-        localStorage.setItem("note-theme", next);
-      } catch (e) {}
+  const picker = document.querySelector("[data-theme-picker]");
+  if (picker) {
+    const toggle = picker.querySelector("[data-theme-toggle]");
+    const menu = picker.querySelector("[data-theme-menu]");
+    const options = Array.from(picker.querySelectorAll("[data-theme-option]"));
+
+    function markCurrent() {
+      const current = document.documentElement.getAttribute("data-theme");
+      options.forEach((option) => {
+        const on = option.dataset.themeOption === current;
+        option.classList.toggle("is-active", on);
+        option.setAttribute("aria-checked", String(on));
+      });
+    }
+
+    function setOpen(open) {
+      menu.hidden = !open;
+      toggle.setAttribute("aria-expanded", String(open));
+      if (open) {
+        markCurrent();
+        (options.find((o) => o.classList.contains("is-active")) || options[0]).focus();
+      }
+    }
+
+    toggle.addEventListener("click", (event) => {
+      event.stopPropagation();
+      setOpen(menu.hidden);
+    });
+
+    options.forEach((option) => {
+      option.addEventListener("click", () => {
+        const theme = option.dataset.themeOption;
+        document.documentElement.setAttribute("data-theme", theme);
+        try {
+          localStorage.setItem("note-theme", theme);
+        } catch (e) {}
+        markCurrent();
+        setOpen(false);
+        toggle.focus();
+      });
+    });
+
+    menu.addEventListener("keydown", (event) => {
+      const i = options.indexOf(document.activeElement);
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const step = event.key === "ArrowDown" ? 1 : -1;
+        options[(i + step + options.length) % options.length].focus();
+      }
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!menu.hidden && !picker.contains(event.target)) {
+        setOpen(false);
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !menu.hidden) {
+        setOpen(false);
+        toggle.focus();
+      }
     });
   }
 

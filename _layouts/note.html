@@ -17,13 +17,13 @@
     (function () {
       var t = null;
       try { t = localStorage.getItem("note-theme"); } catch (e) {}
-      if (t !== "light" && t !== "dark") {
+      if (["light", "dark", "sky", "rose", "lavender", "sepia"].indexOf(t) < 0) {
         t = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
       }
       document.documentElement.setAttribute("data-theme", t);
     })();
   </script>
-  <link rel="stylesheet" href="/deep-learning/assets/notes.css?v=20261128u">
+  <link rel="stylesheet" href="/deep-learning/assets/notes.css?v=20261128v">
   <script>
     window.MathJax = {
       tex: {
@@ -47,10 +47,21 @@
       {% unless page.url == "/" %}
       <a href="/deep-learning/"><span class="note-nav-long">Deep Learning学习笔记</span><span class="note-nav-short">全部笔记</span></a>
       {% endunless %}
-      <button class="note-theme-toggle" type="button" data-theme-toggle aria-label="切换深色 / 浅色模式" title="切换深色 / 浅色模式">
-        <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>
-        <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>
-      </button>
+      <div class="note-theme-picker" data-theme-picker>
+        <button class="note-theme-toggle" type="button" data-theme-toggle aria-haspopup="true" aria-expanded="false" aria-label="切换主题" title="切换主题">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.7 1.8-1.7H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7.2" r="1.2"/><circle cx="15" cy="7.4" r="1.2"/></svg>
+        </button>
+        <div class="note-theme-menu" role="menu" aria-label="主题" data-theme-menu hidden>
+          <div class="note-theme-menu-title">主题</div>
+          {%- assign themes = "light:浅色,dark:深色,sky:天蓝,rose:樱粉,lavender:薰衣草,sepia:护眼米黄" | split: "," %}
+          {%- for th in themes %}
+          {%- assign kv = th | split: ":" %}
+          <button type="button" role="menuitemradio" aria-checked="false" class="note-theme-option" data-theme-option="{{ kv[0] }}">
+            <span class="note-theme-swatch note-theme-swatch--{{ kv[0] }}" aria-hidden="true"></span>{{ kv[1] }}
+          </button>
+          {%- endfor %}
+        </div>
+      </div>
     </nav>
   </header>
 
@@ -87,7 +98,7 @@
     ↑
   </button>
 
-  <script src="/deep-learning/assets/notes.js?v=20261128u"></script>
+  <script src="/deep-learning/assets/notes.js?v=20261128v"></script>
   {%- if page.tag_panel %}
   <script src="/deep-learning/assets/tags.js?v=20261128u"></script>
   {%- endif %}
