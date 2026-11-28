@@ -1,0 +1,279 @@
+{
+ "bce_sum": [
+  {
+   "epoch": 1,
+   "bce": 246.98,
+   "kl": 15.48,
+   "active": 20
+  },
+  {
+   "epoch": 2,
+   "bce": 238.34,
+   "kl": 15.41,
+   "active": 20
+  },
+  {
+   "epoch": 3,
+   "bce": 234.92,
+   "kl": 15.01,
+   "active": 20
+  },
+  {
+   "epoch": 4,
+   "bce": 232.6,
+   "kl": 15.31,
+   "active": 20
+  },
+  {
+   "epoch": 5,
+   "bce": 231.13,
+   "kl": 15.98,
+   "active": 18
+  },
+  {
+   "epoch": 6,
+   "bce": 230.31,
+   "kl": 15.86,
+   "active": 17
+  },
+  {
+   "epoch": 7,
+   "bce": 229.96,
+   "kl": 15.24,
+   "active": 15
+  },
+  {
+   "epoch": 8,
+   "bce": 229.73,
+   "kl": 15.2,
+   "active": 17
+  },
+  {
+   "epoch": 9,
+   "bce": 228.53,
+   "kl": 15.96,
+   "active": 16
+  },
+  {
+   "epoch": 10,
+   "bce": 228.48,
+   "kl": 15.78,
+   "active": 16
+  },
+  {
+   "epoch": 11,
+   "bce": 227.53,
+   "kl": 16.38,
+   "active": 15
+  },
+  {
+   "epoch": 12,
+   "bce": 227.48,
+   "kl": 15.86,
+   "active": 15
+  },
+  {
+   "epoch": 13,
+   "bce": 227.85,
+   "kl": 15.49,
+   "active": 14
+  },
+  {
+   "epoch": 14,
+   "bce": 227.2,
+   "kl": 15.88,
+   "active": 15
+  },
+  {
+   "epoch": 15,
+   "bce": 226.96,
+   "kl": 16.07,
+   "active": 14
+  }
+ ],
+ "mse_mean": [
+  {
+   "epoch": 1,
+   "bce": 387.42,
+   "kl": 0.0,
+   "active": 0
+  },
+  {
+   "epoch": 2,
+   "bce": 386.62,
+   "kl": 0.0,
+   "active": 0
+  },
+  {
+   "epoch": 3,
+   "bce": 386.33,
+   "kl": 0.0,
+   "active": 0
+  },
+  {
+   "epoch": 4,
+   "bce": 385.92,
+   "kl": 0.0,
+   "active": 0
+  },
+  {
+   "epoch": 5,
+   "bce": 385.66,
+   "kl": 0.0,
+   "active": 0
+  },
+  {
+   "epoch": 6,
+   "bce": 385.83,
+   "kl": 0.0,
+   "active": 0
+  },
+  {
+   "epoch": 7,
+   "bce": 385.63,
+   "kl": 0.0,
+   "active": 0
+  },
+  {
+   "epoch": 8,
+   "bce": 385.62,
+   "kl": 0.0,
+   "active": 0
+  },
+  {
+   "epoch": 9,
+   "bce": 385.44,
+   "kl": 0.0,
+   "active": 0
+  },
+  {
+   "epoch": 10,
+   "bce": 385.37,
+   "kl": 0.0,
+   "active": 0
+  },
+  {
+   "epoch": 11,
+   "bce": 385.62,
+   "kl": 0.0,
+   "active": 0
+  },
+  {
+   "epoch": 12,
+   "bce": 385.31,
+   "kl": 0.0,
+   "active": 0
+  },
+  {
+   "epoch": 13,
+   "bce": 385.42,
+   "kl": 0.0,
+   "active": 0
+  },
+  {
+   "epoch": 14,
+   "bce": 385.35,
+   "kl": 0.0,
+   "active": 0
+  },
+  {
+   "epoch": 15,
+   "bce": 385.24,
+   "kl": 0.0,
+   "active": 0
+  }
+ ],
+ "bce_sum_z2": [
+  {
+   "epoch": 1,
+   "bce": 271.99,
+   "kl": 6.43,
+   "active": 2
+  },
+  {
+   "epoch": 2,
+   "bce": 265.87,
+   "kl": 6.51,
+   "active": 2
+  },
+  {
+   "epoch": 3,
+   "bce": 263.13,
+   "kl": 6.59,
+   "active": 2
+  },
+  {
+   "epoch": 4,
+   "bce": 262.06,
+   "kl": 6.29,
+   "active": 2
+  },
+  {
+   "epoch": 5,
+   "bce": 260.55,
+   "kl": 6.75,
+   "active": 2
+  },
+  {
+   "epoch": 6,
+   "bce": 260.32,
+   "kl": 6.32,
+   "active": 2
+  },
+  {
+   "epoch": 7,
+   "bce": 259.23,
+   "kl": 6.48,
+   "active": 2
+  },
+  {
+   "epoch": 8,
+   "bce": 259.03,
+   "kl": 6.36,
+   "active": 2
+  },
+  {
+   "epoch": 9,
+   "bce": 258.48,
+   "kl": 6.42,
+   "active": 2
+  },
+  {
+   "epoch": 10,
+   "bce": 258.37,
+   "kl": 6.03,
+   "active": 2
+  },
+  {
+   "epoch": 11,
+   "bce": 258.58,
+   "kl": 6.34,
+   "active": 2
+  },
+  {
+   "epoch": 12,
+   "bce": 258.37,
+   "kl": 6.22,
+   "active": 2
+  },
+  {
+   "epoch": 13,
+   "bce": 257.56,
+   "kl": 6.35,
+   "active": 2
+  },
+  {
+   "epoch": 14,
+   "bce": 256.87,
+   "kl": 6.69,
+   "active": 2
+  },
+  {
+   "epoch": 15,
+   "bce": 257.08,
+   "kl": 6.32,
+   "active": 2
+  }
+ ],
+ "seconds": 102
+}
