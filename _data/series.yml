@@ -1,0 +1,29 @@
+# Reading series shown as "上一篇 / 下一篇" at the bottom of each post.
+# `posts` lists page URLs in reading order. A post should be in at most one series.
+# New post: append its URL (e.g. /vit-clip/) where it fits in the reading order.
+
+- name: "生成模型主线"
+  posts:
+    - /math-foundation/
+    - /generative-models-1-vae/
+    - /generative-models-2-gan/
+    - /diffusion-study/
+    - /ddpm-from-scratch/
+    - /ddim/
+    - /flow-matching/
+    - /transformer-study/
+    - /dit/
+
+- name: "Stable Diffusion 生态"
+  posts:
+    - /latent-diffusion/
+    - /stable-diffusion/
+    - /lora/
+    - /controlnet/
+    - /t2i-adapter/
+    - /ip-adapter/
+
+- name: "实时视频与数字人"
+  posts:
+    - /fast-video-diffusion/
+    - /muse-realtime-avatar/

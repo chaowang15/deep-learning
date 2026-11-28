@@ -1,4 +1,6 @@
 (function () {
+  // Homepage filter: by tag (#tag=<slug>) or by month (#month=YYYY-MM).
+  // Buttons carry data-filter="tag:<slug>" | "month:YYYY-MM" | "" (show all).
   const cards = Array.from(document.querySelectorAll("[data-note-card]"));
   if (!cards.length) {
     return;
@@ -6,46 +8,56 @@
 
   const list = document.querySelector("[data-note-list]");
   const status = document.querySelector("[data-tag-status]");
+  const statusKind = document.querySelector("[data-tag-status-kind]");
   const statusName = document.querySelector("[data-tag-status-name]");
   const statusCount = document.querySelector("[data-tag-status-count]");
   const empty = document.querySelector("[data-tag-empty]");
-  const buttons = Array.from(document.querySelectorAll("[data-tag-filter]"));
+  const buttons = Array.from(document.querySelectorAll("[data-filter]"));
   const labels = {};
   buttons.forEach((button) => {
-    if (button.dataset.tagFilter) {
-      labels[button.dataset.tagFilter] = button.dataset.tagLabel;
+    if (button.dataset.filter && button.dataset.filterLabel) {
+      labels[button.dataset.filter] = button.dataset.filterLabel;
     }
   });
 
   let current = "";
 
-  function tagFromHash() {
-    const match = location.hash.match(/^#tag=([\w-]+)$/);
-    return match && labels[match[1]] ? match[1] : "";
+  function fromHash() {
+    const match = location.hash.match(/^#(tag|month)=([\w-]+)$/);
+    const key = match ? `${match[1]}:${match[2]}` : "";
+    return labels[key] ? key : "";
   }
 
-  function apply(tag, updateUrl) {
-    current = tag;
+  function matches(card, filter) {
+    if (!filter) {
+      return true;
+    }
+    const [kind, value] = filter.split(":");
+    if (kind === "tag") {
+      return card.dataset.tags.split(" ").includes(value);
+    }
+    return card.dataset.month === value;
+  }
+
+  function apply(filter, updateUrl) {
+    current = filter;
     let shown = 0;
     cards.forEach((card) => {
-      const visible = !tag || card.dataset.tags.split(" ").includes(tag);
-      const wasHidden = card.hidden;
+      const visible = matches(card, filter);
       card.hidden = !visible;
       if (visible) {
         shown += 1;
-        if (wasHidden || updateUrl) {
-          card.classList.remove("is-entering");
-          void card.offsetWidth;
-          card.classList.add("is-entering");
-        }
+        card.classList.remove("is-entering");
+        void card.offsetWidth;
+        card.classList.add("is-entering");
       }
     });
 
     buttons.forEach((button) => {
-      if (button.classList.contains("tag-status-clear")) {
+      if (button.hasAttribute("data-filter-clear")) {
         return;
       }
-      const on = button.dataset.tagFilter === tag;
+      const on = button.dataset.filter === filter;
       button.classList.toggle("is-active", on);
       button.setAttribute("aria-pressed", String(on));
       const row = button.closest(".tag-filter--row");
@@ -55,9 +67,11 @@
     });
 
     if (status) {
-      status.hidden = !tag;
-      if (tag) {
-        statusName.textContent = labels[tag] || tag;
+      status.hidden = !filter;
+      if (filter) {
+        statusKind.textContent = filter.startsWith("tag:") ? "标签" : "月份";
+        statusName.textContent = labels[filter] || filter;
+        statusName.classList.toggle("is-tag", filter.startsWith("tag:"));
         statusCount.textContent = shown;
       }
     }
@@ -66,21 +80,21 @@
     }
 
     if (updateUrl) {
-      const url = tag ? `#tag=${tag}` : location.pathname + location.search;
+      const url = filter ? `#${filter.replace(":", "=")}` : location.pathname + location.search;
       history.replaceState(null, "", url);
     }
   }
 
   document.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-tag-filter]");
+    const button = event.target.closest("[data-filter]");
     if (!button) {
       return;
     }
     event.preventDefault();
-    const tag = button.dataset.tagFilter;
+    const filter = button.dataset.filter;
     const fromCard = Boolean(button.closest("[data-note-card]"));
-    // Clicking the active tag in the panel toggles it off; a card chip always selects.
-    const next = tag && tag === current && !fromCard ? "" : tag;
+    // Clicking the active filter in the panel toggles it off; a card chip always selects.
+    const next = filter && filter === current && !fromCard ? "" : filter;
     apply(next, true);
     if (fromCard && list) {
       const top = list.getBoundingClientRect().top + window.scrollY - 140;
@@ -90,6 +104,6 @@
     }
   });
 
-  window.addEventListener("hashchange", () => apply(tagFromHash(), false));
-  apply(tagFromHash(), false);
+  window.addEventListener("hashchange", () => apply(fromHash(), false));
+  apply(fromHash(), false);
 })();

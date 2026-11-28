@@ -1,0 +1,37 @@
+{%- comment -%} Prev / next within the post's reading series (_data/series.yml). {%- endcomment -%}
+{%- for s in site.data.series %}
+{%- if s.posts contains page.url %}
+{%- assign n = s.posts | size %}
+{%- for u in s.posts %}{% if u == page.url %}{% assign idx = forloop.index0 %}{% endif %}{% endfor %}
+{%- assign prev_i = idx | minus: 1 %}
+{%- assign next_i = idx | plus: 1 %}
+<nav class="series-nav" aria-label="系列导航">
+  <div class="series-nav-head">
+    <span class="series-nav-label">系列</span>
+    <strong>{{ s.name }}</strong>
+    <span class="series-nav-progress">{{ idx | plus: 1 }} / {{ n }}</span>
+  </div>
+  <div class="series-nav-bar"><span style="width: {{ idx | plus: 1 | times: 100 | divided_by: n }}%"></span></div>
+  <div class="series-nav-links">
+    {%- if idx > 0 %}
+    {%- assign p = site.pages | where: "url", s.posts[prev_i] | first %}
+    <a class="series-nav-link series-nav-link--prev" href="{{ p.url | relative_url }}"><span>← 上一篇</span><strong>{{ p.title }}</strong></a>
+    {%- else %}<span></span>{%- endif %}
+    {%- if next_i < n %}
+    {%- assign q = site.pages | where: "url", s.posts[next_i] | first %}
+    <a class="series-nav-link series-nav-link--next" href="{{ q.url | relative_url }}"><span>下一篇 →</span><strong>{{ q.title }}</strong></a>
+    {%- endif %}
+  </div>
+  <details class="series-nav-all">
+    <summary>查看整个系列</summary>
+    <ol>
+      {%- for u in s.posts %}
+      {%- assign sp = site.pages | where: "url", u | first %}
+      <li{% if u == page.url %} class="is-current"{% endif %}><a href="{{ sp.url | relative_url }}">{{ sp.title }}</a></li>
+      {%- endfor %}
+    </ol>
+  </details>
+</nav>
+{%- break %}
+{%- endif %}
+{%- endfor %}

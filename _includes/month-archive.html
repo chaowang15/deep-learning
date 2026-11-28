@@ -1,0 +1,13 @@
+{%- comment -%} Posts per month, newest first; each month is a filter button. {%- endcomment -%}
+{%- assign arch_notes = site.pages | where_exp: "p", "p.summary" | sort: "date" | reverse -%}
+{%- assign arch_months = arch_notes | group_by_exp: "p", "p.date | date: '%Y-%m'" -%}
+<div class="month-archive">
+  {%- for m in arch_months %}
+  {%- assign parts = m.name | split: "-" %}
+  <button type="button" class="month-archive-item" data-filter="month:{{ m.name }}" data-filter-label="{{ parts[0] }}.{{ parts[1] }}" aria-pressed="false">
+    <span class="month-archive-name">{{ parts[0] }}.{{ parts[1] }}</span>
+    <span class="month-archive-bar"><span style="width: {{ m.size | times: 100 | divided_by: arch_notes.size }}%"></span></span>
+    <span class="month-archive-count">{{ m.size }}</span>
+  </button>
+  {%- endfor %}
+</div>

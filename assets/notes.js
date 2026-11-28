@@ -1,9 +1,26 @@
 (function () {
+  const themeToggle = document.querySelector("[data-theme-toggle]");
+  if (themeToggle) {
+    themeToggle.addEventListener("click", () => {
+      const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      try {
+        localStorage.setItem("note-theme", next);
+      } catch (e) {}
+    });
+  }
+
   const article = document.querySelector("[data-note-article]");
   const toc = document.querySelector("[data-note-toc]");
 
   if (!article) {
     return;
+  }
+
+  const meta = article.querySelector("[data-note-meta]");
+  const title = article.querySelector("h1");
+  if (meta && title) {
+    title.after(meta);
   }
 
   article.querySelectorAll('a[href^="http://"], a[href^="https://"]').forEach((link) => {

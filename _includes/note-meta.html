@@ -1,0 +1,14 @@
+{%- comment -%} Date, reading time and tags under a post's h1 (notes.js moves it right after the h1). {%- endcomment -%}
+<div class="note-meta" data-note-meta>
+  <time datetime="{{ page.date | date: '%Y-%m-%d' }}">{{ page.date | date: '%Y.%m.%d' }}</time>
+  <span class="note-meta-sep">·</span>
+  <span>约 {% include reading-time.html content=content %} 分钟</span>
+  {%- if page.tags %}
+  <span class="note-meta-tags">
+    {%- for t in page.tags %}
+    {%- assign td = site.data.tags.tags | where: "name", t | first %}
+    <a class="tag-chip tag-chip--sm" data-group="{{ td.group | default: 'other' }}" href="{{ '/' | relative_url }}#tag={{ t | slugify }}">{{ t }}</a>
+    {%- endfor %}
+  </span>
+  {%- endif %}
+</div>

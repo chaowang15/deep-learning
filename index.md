@@ -16,24 +16,24 @@ tag_panel: true
 </div>
 
 <div class="tag-status" data-tag-status hidden>
-  <span>标签 <b class="tag-status-name" data-tag-status-name></b> · <span data-tag-status-count></span> 篇</span>
-  <button type="button" class="tag-status-clear" data-tag-filter="">清除筛选 ×</button>
+  <span><span data-tag-status-kind>标签</span> <b class="tag-status-name" data-tag-status-name></b> · <span data-tag-status-count></span> 篇</span>
+  <button type="button" class="tag-status-clear" data-filter="" data-filter-clear>清除筛选 ×</button>
 </div>
 
 <div class="note-index-list" data-note-list>
   {%- assign notes = site.pages | where_exp: "p", "p.summary" | sort: "date" | reverse -%}
   {%- for note in notes %}
-  <article class="note-index-card" data-note-card data-tags="{% for t in note.tags %}{{ t | slugify }} {% endfor %}">
+  <article class="note-index-card" data-note-card data-tags="{% for t in note.tags %}{{ t | slugify }} {% endfor %}" data-month="{{ note.date | date: '%Y-%m' }}">
     <a class="note-index-card-head" href="{{ note.url | relative_url }}">
       <strong>{{ note.title }}</strong>
-      <time datetime="{{ note.date | date: '%Y-%m-%d' }}">{{ note.date | date: '%Y.%m' }}</time>
+      <span class="note-index-card-meta"><time datetime="{{ note.date | date: '%Y-%m-%d' }}">{{ note.date | date: '%Y.%m.%d' }}</time><span class="note-index-card-rt">约 {% include reading-time.html content=note.content %} 分钟</span></span>
     </a>
     <span class="note-index-summary">{{ note.summary }}</span>
     {%- if note.tags %}
     <span class="note-index-tags">
       {%- for t in note.tags %}
       {%- assign td = site.data.tags.tags | where: "name", t | first %}
-      <button type="button" class="tag-chip tag-chip--sm" data-group="{{ td.group | default: 'other' }}" data-tag-filter="{{ t | slugify }}" data-tag-label="{{ t }}" aria-pressed="false">{{ t }}</button>
+      <button type="button" class="tag-chip tag-chip--sm" data-group="{{ td.group | default: 'other' }}" data-filter="tag:{{ t | slugify }}" data-filter-label="#{{ t }}" aria-pressed="false">{{ t }}</button>
       {%- endfor %}
     </span>
     {%- endif %}
