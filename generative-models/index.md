@@ -113,8 +113,8 @@ AutoEncoders 的另一个常见用途是用于 Supervised training 中，例如�
 
 <div class="note-index-list">
   <a class="note-index-card" href="/deep-learning/generative-models-1-vae/">
-    <strong>Generative Models 1: VAE</strong>
-    <span>AutoEncoders, VAE intuition, ELBO derivation, loss terms, reparameterization trick, Conv-VAE, and VQ-VAE references.</span>
+    <strong>VAE 与 VQ-VAE：从推导到实现</strong>
+    <span>VAE intuition, ELBO derivation, from ELBO to the training loss, reparameterization, PyTorch experiments, Conv-VAE, and VQ-VAE with an autoregressive prior.</span>
   </a>
   <a class="note-index-card" href="/deep-learning/generative-models-2-gan/">
     <strong>Generative Models 2: GAN</strong>

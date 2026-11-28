@@ -1,0 +1,93 @@
+{
+ "vq": [
+  {
+   "epoch": 1,
+   "bce": 221.95,
+   "mse": 0.01304,
+   "used": 42,
+   "perplexity": 25.0
+  },
+  {
+   "epoch": 2,
+   "bce": 212.39,
+   "mse": 0.00896,
+   "used": 63,
+   "perplexity": 44.9
+  },
+  {
+   "epoch": 3,
+   "bce": 209.57,
+   "mse": 0.00783,
+   "used": 63,
+   "perplexity": 45.4
+  },
+  {
+   "epoch": 4,
+   "bce": 207.46,
+   "mse": 0.00698,
+   "used": 64,
+   "perplexity": 46.2
+  },
+  {
+   "epoch": 5,
+   "bce": 206.68,
+   "mse": 0.00667,
+   "used": 64,
+   "perplexity": 46.3
+  },
+  {
+   "epoch": 6,
+   "bce": 205.93,
+   "mse": 0.00639,
+   "used": 64,
+   "perplexity": 46.8
+  },
+  {
+   "epoch": 7,
+   "bce": 205.33,
+   "mse": 0.00616,
+   "used": 64,
+   "perplexity": 47.8
+  },
+  {
+   "epoch": 8,
+   "bce": 205.07,
+   "mse": 0.00606,
+   "used": 64,
+   "perplexity": 48.2
+  }
+ ],
+ "prior": [
+  {
+   "epoch": 1,
+   "nll_per_token": 2.198,
+   "bits_per_image": 155.4
+  },
+  {
+   "epoch": 2,
+   "nll_per_token": 1.996,
+   "bits_per_image": 141.1
+  },
+  {
+   "epoch": 3,
+   "nll_per_token": 1.909,
+   "bits_per_image": 135.0
+  },
+  {
+   "epoch": 4,
+   "nll_per_token": 1.855,
+   "bits_per_image": 131.1
+  },
+  {
+   "epoch": 5,
+   "nll_per_token": 1.819,
+   "bits_per_image": 128.6
+  },
+  {
+   "epoch": 6,
+   "nll_per_token": 1.798,
+   "bits_per_image": 127.1
+  }
+ ],
+ "seconds": 948
+}
