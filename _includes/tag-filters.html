@@ -1,0 +1,25 @@
+{%- comment -%}
+  Tag filter chips. Tags come from each note's front matter `tags:`;
+  the curated list, display order and groups live in _data/tags.yml.
+  include.grouped = true renders group headings (sidebar); otherwise one wrapped row.
+{%- endcomment -%}
+{%- assign tag_notes = site.pages | where_exp: "p", "p.summary" -%}
+<div class="tag-filter{% if include.grouped %} tag-filter--grouped{% else %} tag-filter--row{% endif %}" role="group" aria-label="按标签筛选">
+  <button type="button" class="tag-chip tag-chip--all is-active" data-tag-filter="" aria-pressed="true">
+    <span class="tag-chip-name">全部</span><span class="tag-chip-count">{{ tag_notes | size }}</span>
+  </button>
+  {%- for g in site.data.tags.groups %}
+  {%- assign gtags = site.data.tags.tags | where: "group", g.id %}
+  {%- if include.grouped %}
+  <div class="tag-group-label">{{ g.label }}</div>
+  {%- endif %}
+  {%- for t in gtags %}
+  {%- assign c = tag_notes | where_exp: "n", "n.tags contains t.name" | size %}
+  {%- if c > 0 %}
+  <button type="button" class="tag-chip" data-group="{{ g.id }}" data-tag-filter="{{ t.name | slugify }}" data-tag-label="{{ t.name }}" aria-pressed="false" title="{{ t.zh }}">
+    <span class="tag-chip-name">{{ t.name }}</span><span class="tag-chip-count">{{ c }}</span>
+  </button>
+  {%- endif %}
+  {%- endfor %}
+  {%- endfor %}
+</div>

@@ -1,0 +1,53 @@
+# Curated tag set for the homepage filter.
+# Posts list their tags in front matter, e.g.  tags: [Diffusion, Sampling]
+# Use the exact `name` below. Keep each post to 1-3 tags.
+# To add a new tag: add an entry here (pick a group), then use it in a post.
+# Groups control the section headings and chip colors in the tag panel.
+
+groups:
+  - id: basics
+    label: "基础"
+  - id: models
+    label: "生成模型"
+  - id: methods
+    label: "方法与技巧"
+  - id: apps
+    label: "系统与应用"
+
+tags:
+  - name: Math
+    zh: "数学基础"
+    group: basics
+  - name: Transformer
+    zh: "注意力与 Transformer"
+    group: basics
+  - name: VAE
+    zh: "变分自编码器"
+    group: models
+  - name: GAN
+    zh: "生成对抗网络"
+    group: models
+  - name: Diffusion
+    zh: "扩散模型"
+    group: models
+  - name: Flow Matching
+    zh: "流匹配 / Rectified Flow"
+    group: models
+  - name: Sampling
+    zh: "采样与加速"
+    group: methods
+  - name: Control
+    zh: "条件控制"
+    group: methods
+  - name: Fine-tuning
+    zh: "微调"
+    group: methods
+  - name: Distillation
+    zh: "蒸馏"
+    group: methods
+  - name: Stable Diffusion
+    zh: "SD 生态"
+    group: apps
+  - name: Video & Avatar
+    zh: "视频与数字人"
+    group: apps

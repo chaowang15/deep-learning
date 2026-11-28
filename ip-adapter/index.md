@@ -1,5 +1,6 @@
 ---
 date: 2026-11-27 08:00:00 -0800
+tags: [Control, Stable Diffusion]
 keywords: >-
   IP-Adapter, image prompt, decoupled cross-attention, CLIP image embedding, OpenCLIP ViT-H/14, image projection, IP-Adapter Plus, IP-Adapter FaceID, Stable Diffusion 1.5, SDXL, ControlNet, T2I-Adapter, diffusers, PyTorch.
 summary: >-

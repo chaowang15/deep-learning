@@ -1,5 +1,6 @@
 ---
 date: 2025-01-01 00:00:00 -0800
+tags: [Math]
 keywords: >-
   Bayes rule, Gaussian distributions, expected value, variance, KL divergence, BCE, transposed convolution, and trace.
 summary: >-

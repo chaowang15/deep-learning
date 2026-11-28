@@ -1,5 +1,6 @@
 ---
 date: 2026-11-27 05:00:00 -0800
+tags: [Fine-tuning, Stable Diffusion]
 keywords: >-
   LoRA, low-rank adaptation, parameter-efficient fine-tuning, PEFT, intrinsic rank, merge weights, Stable Diffusion LoRA, DreamBooth, prior preservation, style LoRA, AnimateDiff, MotionLoRA, QLoRA, DoRA, LyCORIS, diffusers, PyTorch.
 summary: >-

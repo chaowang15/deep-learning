@@ -1,5 +1,6 @@
 ---
 date: 2026-11-26 16:30:00 -0800
+tags: [Diffusion]
 keywords: >-
   DDPM from scratch, PyTorch, noise schedule, forward process, sinusoidal timestep embedding, U-Net, training, sampling, DDIM, classifier-free guidance, v-prediction, SNR.
 summary: >-

@@ -23,11 +23,20 @@ layout: note
 title: "标题"
 description: "一句话描述"
 date: 2026-11-26 14:00:00 -0800   # 用完整时间，同一天的多篇也能排序
+tags: [Diffusion, Sampling]           # 1-3 个，必须用 _data/tags.yml 里的名字
 keywords: >-
-  English keywords shown on the card.
+  English keywords (only used for the page's <meta>, not shown on the card).
 summary: >-
   卡片上的中文摘要。
 ---
 ```
 
 没有 `summary` 的页面不会出现在首页列表里。
+
+## 标签
+
+首页右侧的 Topics 面板和卡片上的标签来自每篇笔记 front matter 里的 `tags`。可用的标签、分组和显示顺序在 [`_data/tags.yml`](_data/tags.yml)：
+
+- 每篇选 1–3 个，名字要和 `tags.yml` 里的 `name` 完全一致（含空格和大小写；带 `&` 的要加引号，如 `"Video & Avatar"`）。
+- 现有标签不够用时，先在 `tags.yml` 里加一项（选好 `group`），再在笔记里用。不在 `tags.yml` 里的标签不会出现在筛选面板。
+- 可以用 `#tag=<slug>` 直接链接到筛选结果，比如 `/deep-learning/#tag=diffusion`。

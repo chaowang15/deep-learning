@@ -1,5 +1,6 @@
 ---
 date: 2026-01-01 00:00:00 -0800
+tags: [GAN]
 keywords: >-
   GAN, minimax objective, optimal discriminator, Jensen-Shannon divergence, non-saturating loss, mode collapse, DCGAN, conditional GAN, WGAN, WGAN-GP, spectral normalization, hinge loss, PatchGAN, Pix2Pix, CycleGAN, StyleGAN, VQGAN.
 summary: >-

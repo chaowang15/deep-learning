@@ -1,5 +1,6 @@
 ---
 date: 2026-11-27 07:00:00 -0800
+tags: [Control, Stable Diffusion]
 keywords: >-
   T2I-Adapter, spatial conditioning, sketch, canny, depth, pose, segmentation, pixel unshuffle, adapter, frozen U-Net, composable adapters, ControlNet comparison, Stable Diffusion 1.5, SDXL, diffusers, PyTorch.
 summary: >-

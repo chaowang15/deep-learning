@@ -1,5 +1,6 @@
 ---
 date: 2026-11-27 00:30:00 -0800
+tags: [Control, Stable Diffusion]
 keywords: >-
   ControlNet, spatial conditioning, zero convolution, trainable copy, frozen U-Net, Canny edge, depth, pose, segmentation, control scale, classifier-free guidance, guess mode, Multi-ControlNet, Stable Diffusion 1.5, diffusers, PyTorch.
 summary: >-
