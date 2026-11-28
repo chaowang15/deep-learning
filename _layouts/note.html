@@ -23,7 +23,7 @@
       document.documentElement.setAttribute("data-theme", t);
     })();
   </script>
-  <link rel="stylesheet" href="/deep-learning/assets/notes.css?v=20261128v">
+  <link rel="stylesheet" href="/deep-learning/assets/notes.css?v=20261128w">
   <script>
     window.MathJax = {
       tex: {
@@ -45,7 +45,9 @@
     <div class="note-current-title" aria-current="page">{{ page.title }}</div>
     <nav class="note-nav" aria-label="Section navigation">
       {% unless page.url == "/" %}
-      <a href="/deep-learning/"><span class="note-nav-long">Deep Learning学习笔记</span><span class="note-nav-short">全部笔记</span></a>
+      <a class="note-home-btn" href="/deep-learning/" aria-label="Home：全部笔记" title="回到笔记首页">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9v10.5h4.5v-6h4v6h4.5V9"/></svg><span>Home</span>
+      </a>
       {% endunless %}
       <div class="note-theme-picker" data-theme-picker>
         <button class="note-theme-toggle" type="button" data-theme-toggle aria-haspopup="true" aria-expanded="false" aria-label="切换主题" title="切换主题">
