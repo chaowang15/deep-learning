@@ -8,6 +8,7 @@
 | [`vae/`](vae/) | VAE / VQ-VAE 实验 |
 | [`gan/`](gan/) | GAN / DCGAN / WGAN-GP / VQGAN 实验 |
 | [`flow/`](flow/) | Flow Matching / Rectified Flow 实验 |
+| [`dit/`](dit/) | DiT 实现与实验 |
 | [`_template/`](_template/) | 新论文 / 新主题学习项目的骨架，复制后改名即可 |
 
 约定：
