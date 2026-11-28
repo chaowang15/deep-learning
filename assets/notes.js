@@ -2,7 +2,7 @@
   const article = document.querySelector("[data-note-article]");
   const toc = document.querySelector("[data-note-toc]");
 
-  if (!article || !toc) {
+  if (!article) {
     return;
   }
 
@@ -90,6 +90,10 @@
         closeLightbox();
       }
     });
+  }
+
+  if (!toc) {
+    return;
   }
 
   const headings = Array.from(article.querySelectorAll("h2, h3, h4"));

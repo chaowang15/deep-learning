@@ -1,5 +1,6 @@
 ---
 date: 2025-09-01 00:00:00 -0800
+tags: [VAE]
 keywords: >-
   VAE, ELBO derivation, reparameterization trick, VAE loss scaling, posterior collapse, Conv-VAE, VQ-VAE, vector quantization, straight-through estimator, codebook, autoregressive prior, VQGAN, FSQ.
 summary: >-

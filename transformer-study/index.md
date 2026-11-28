@@ -1,5 +1,6 @@
 ---
 date: 2026-05-01 00:00:00 -0800
+tags: [Transformer]
 keywords: >-
   Seq2Seq and RNN review, attention, Transformer encoder-decoder flow, multi-head attention, loss design, and inference.
 summary: >-

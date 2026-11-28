@@ -1,5 +1,6 @@
 ---
 date: 2026-11-26 21:00:00 -0800
+tags: [Stable Diffusion, Diffusion]
 keywords: >-
   Stable Diffusion 1.x, latent diffusion, CLIP tokenizer, CLIP text encoder, VAE, scaling factor, U-Net, cross-attention, TimeResBlock, DownBlock, UpBlock, scheduler, classifier-free guidance, training, inference, PyTorch.
 summary: >-

@@ -1,5 +1,6 @@
 ---
 date: 2026-11-26 19:30:00 -0800
+tags: [Diffusion, Sampling]
 keywords: >-
   DDIM, denoising diffusion implicit models, fast sampling, non-Markovian, deterministic sampling, eta, probability flow ODE, Euler, DDIM inversion, timestep spacing, PyTorch.
 summary: >-

@@ -1,5 +1,6 @@
 ---
 date: 2026-11-28 01:00:00 -0800
+tags: [Flow Matching, Sampling]
 keywords: >-
   Flow Matching, Rectified Flow, Reflow, conditional flow matching, velocity field, probability path, continuity equation, ODE, Euler, Heun, DDIM, v-prediction, logit-normal, timestep shift, Stable Diffusion 3, FLUX, PyTorch.
 summary: >-

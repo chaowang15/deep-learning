@@ -1,5 +1,6 @@
 ---
 date: 2026-11-28 02:00:00 -0800
+tags: [Diffusion, Transformer]
 keywords: >-
   DiT, Diffusion Transformer, Scalable Diffusion Models with Transformers, ViT, patchify, unpatchify, 2D sin-cos position embedding, adaLN, adaLN-Zero, in-context conditioning, cross-attention, Gflops, scaling, latent diffusion, learned sigma, SiT, PixArt-alpha, MM-DiT, SD3, FLUX, Sora, PyTorch.
 summary: >-

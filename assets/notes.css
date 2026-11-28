@@ -400,18 +400,40 @@ a {
 }
 
 .note-index-card {
+  position: relative;
   display: block;
-  padding: 18px 20px;
+  padding: 18px 20px 16px;
   border: 1px solid var(--note-border);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--note-paper);
   color: var(--note-text);
-  text-decoration: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.note-index-card[hidden] {
+  display: none;
 }
 
 .note-index-card:hover {
   border-color: #c8d5df;
   box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+  transform: translateY(-1px);
+}
+
+.note-index-card.is-entering {
+  animation: note-card-in 0.28s ease both;
+}
+
+@keyframes note-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .note-index-card-head {
@@ -419,7 +441,26 @@ a {
   gap: 14px;
   align-items: baseline;
   justify-content: space-between;
-  margin-bottom: 5px;
+  margin-bottom: 6px;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* The title link covers the whole card; tag chips sit above it. */
+.note-index-card-head::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.note-index-card-head:focus-visible {
+  outline: none;
+}
+
+.note-index-card:has(.note-index-card-head:focus-visible) {
+  border-color: var(--note-accent);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.16);
 }
 
 .note-index-card strong {
@@ -428,26 +469,184 @@ a {
   font-size: 18px;
 }
 
+.note-index-card:hover strong {
+  color: var(--note-accent);
+}
+
 .note-index-card time {
   flex: 0 0 auto;
   color: var(--note-muted);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
-  font-size: 13px;
-  font-weight: 620;
-}
-
-.note-index-keywords {
-  display: block;
-  color: var(--note-muted);
-  font-size: 15px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  font-weight: 560;
 }
 
 .note-index-summary {
   display: block;
-  margin-top: 8px;
   color: #344054;
   font-size: 15.5px;
   line-height: 1.62;
+}
+
+.note-index-tags {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+/* ---------- Tag chips & filter ---------- */
+
+.tag-chip {
+  --tag: #475467;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--tag) 26%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tag) 7%, #ffffff);
+  color: color-mix(in srgb, var(--tag) 88%, #000000);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  font-weight: 560;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tag-chip::before {
+  content: "#";
+  opacity: 0.55;
+  margin-right: -3px;
+}
+
+.tag-chip--all::before {
+  content: none;
+}
+
+.tag-chip[data-group="basics"] { --tag: #2563eb; }
+.tag-chip[data-group="models"] { --tag: #0f766e; }
+.tag-chip[data-group="methods"] { --tag: #7c3aed; }
+.tag-chip[data-group="apps"] { --tag: #c2410c; }
+
+.tag-chip:hover {
+  border-color: color-mix(in srgb, var(--tag) 55%, transparent);
+  background: color-mix(in srgb, var(--tag) 13%, #ffffff);
+}
+
+.tag-chip:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tag) 25%, transparent);
+}
+
+.tag-chip.is-active {
+  border-color: var(--tag);
+  background: var(--tag);
+  color: #ffffff;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--tag) 30%, transparent);
+}
+
+.tag-chip--all {
+  --tag: #111827;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+}
+
+.tag-chip-count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tag) 12%, transparent);
+  font-size: 11px;
+  text-align: center;
+}
+
+.tag-chip.is-active .tag-chip-count {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.tag-chip--sm {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+.tag-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.tag-filter--grouped .tag-chip--all {
+  margin-bottom: 4px;
+}
+
+.tag-group-label {
+  flex: 0 0 100%;
+  margin: 10px 0 0;
+  color: #98a2b3;
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+}
+
+.note-tag-panel-hint {
+  margin: -4px 0 14px;
+  color: var(--note-muted);
+  font-size: 12.5px;
+}
+
+.tag-bar {
+  display: none;
+  margin: 22px 0 0;
+}
+
+.tag-status {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 24px 0 -12px;
+  padding: 9px 14px;
+  border: 1px dashed #c8d5df;
+  border-radius: 10px;
+  background: var(--note-soft);
+  color: #344054;
+  font-size: 14px;
+}
+
+.tag-status[hidden],
+.tag-empty[hidden] {
+  display: none;
+}
+
+.tag-status-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--note-accent);
+}
+
+.tag-status-name::before {
+  content: "#";
+}
+
+.tag-status-clear {
+  padding: 2px 4px;
+  border: 0;
+  background: none;
+  color: var(--note-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tag-status-clear:hover {
+  color: var(--note-accent);
+}
+
+.tag-empty {
+  color: var(--note-muted);
+  text-align: center;
 }
 
 .note-back-to-top {
@@ -501,6 +700,10 @@ a {
     display: none;
   }
 
+  .tag-bar {
+    display: block;
+  }
+
   .note-back-to-top {
     right: 18px;
   }
@@ -509,6 +712,22 @@ a {
 @media (max-width: 700px) {
   body {
     font-size: 16px;
+  }
+
+  .tag-filter--row {
+    flex-wrap: nowrap;
+    margin: 0 -18px;
+    padding: 2px 18px 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .tag-filter--row::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tag-filter--row .tag-chip {
+    flex: 0 0 auto;
   }
 
   .note-topbar {

@@ -1,5 +1,6 @@
 ---
 date: 2026-11-27 03:00:00 -0800
+tags: [Diffusion, VAE, Stable Diffusion]
 keywords: >-
   Latent Diffusion Model, LDM, perceptual compression, semantic compression, autoencoder, KL-reg, VQ-reg, LPIPS, PatchGAN, downsampling factor, scale factor, cross-attention, concatenation conditioning, Stable Diffusion, PyTorch.
 summary: >-

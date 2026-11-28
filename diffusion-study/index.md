@@ -1,5 +1,6 @@
 ---
 date: 2026-06-01 00:00:00 -0800
+tags: [Diffusion, Math]
 keywords: >-
   DDPM, forward process, reverse process, ELBO, beta schedule, training loss, and sampling.
 summary: >-
