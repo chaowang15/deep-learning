@@ -13,6 +13,8 @@ RESUME=/tmp/dit_main.pt python3 train_dit.py adaln_zero 5000 main_cont   # conti
 python3 classifier.py                                   # small FashionMNIST CNN used for scoring (test acc 89.3%)
 python3 eval_figs.py                                    # U-Net vs DiT p=4 vs p=2: class accuracy, feature FD; figures
 python3 eval_longer.py                                  # per-t velocity error, DiT at 7500 steps, dit_longer.png
+python3 train_unet_cont.py 5000                         # continue the flow post's U-Net to 7500 steps, same protocol, ~39 min
+python3 eval_7500.py                                    # same-step comparison: dit_vs_unet_7500.png, dit_curves_7500.png
 ```
 
 `dit.py` is the model (with a `cond_mode` switch for the four block designs). The U-Net baseline is
