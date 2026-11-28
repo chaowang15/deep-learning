@@ -13,7 +13,17 @@
   <link rel="canonical" href="{{ site.url }}{{ site.baseurl }}{{ page.url | replace:'index.html','' }}">
   <link rel="icon" media="(prefers-color-scheme:dark)" href="/assets/img/logo_CW_from_online_64x64.png" type="image/png">
   <link rel="icon" media="(prefers-color-scheme:light)" href="/assets/img/logo_CW_from_online_64x64.png" type="image/png">
-  <link rel="stylesheet" href="/deep-learning/assets/notes.css?v=20261128t">
+  <script>
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem("note-theme"); } catch (e) {}
+      if (t !== "light" && t !== "dark") {
+        t = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      }
+      document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+  <link rel="stylesheet" href="/deep-learning/assets/notes.css?v=20261128u">
   <script>
     window.MathJax = {
       tex: {
@@ -35,15 +45,25 @@
     <div class="note-current-title" aria-current="page">{{ page.title }}</div>
     <nav class="note-nav" aria-label="Section navigation">
       {% unless page.url == "/" %}
-      <a href="/deep-learning/">Deep Learning学习笔记</a>
+      <a href="/deep-learning/"><span class="note-nav-long">Deep Learning学习笔记</span><span class="note-nav-short">全部笔记</span></a>
       {% endunless %}
+      <button class="note-theme-toggle" type="button" data-theme-toggle aria-label="切换深色 / 浅色模式" title="切换深色 / 浅色模式">
+        <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>
+      </button>
     </nav>
   </header>
 
   <div class="note-shell">
     <main class="note-main">
       <article class="note-article" data-note-article>
+        {%- if page.summary %}
+        {% include note-meta.html %}
+        {%- endif %}
         {{ content }}
+        {%- if page.summary %}
+        {% include series-nav.html %}
+        {%- endif %}
       </article>
     </main>
 
@@ -52,6 +72,8 @@
       <div class="note-toc-title">Topics</div>
       <p class="note-tag-panel-hint">点击标签筛选文章</p>
       {% include tag-filters.html grouped=true %}
+      <div class="note-toc-title note-archive-title">Archive</div>
+      {% include month-archive.html %}
     </aside>
     {%- else %}
     <aside class="note-toc" aria-label="Table of contents">
@@ -65,9 +87,9 @@
     ↑
   </button>
 
-  <script src="/deep-learning/assets/notes.js?v=20261128t"></script>
+  <script src="/deep-learning/assets/notes.js?v=20261128u"></script>
   {%- if page.tag_panel %}
-  <script src="/deep-learning/assets/tags.js?v=20261128t"></script>
+  <script src="/deep-learning/assets/tags.js?v=20261128u"></script>
   {%- endif %}
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-S94YYNZWEY"></script>
   <script>

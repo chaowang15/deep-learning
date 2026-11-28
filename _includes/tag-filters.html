@@ -5,7 +5,7 @@
 {%- endcomment -%}
 {%- assign tag_notes = site.pages | where_exp: "p", "p.summary" -%}
 <div class="tag-filter{% if include.grouped %} tag-filter--grouped{% else %} tag-filter--row{% endif %}" role="group" aria-label="按标签筛选">
-  <button type="button" class="tag-chip tag-chip--all is-active" data-tag-filter="" aria-pressed="true">
+  <button type="button" class="tag-chip tag-chip--all is-active" data-filter="" aria-pressed="true">
     <span class="tag-chip-name">全部</span><span class="tag-chip-count">{{ tag_notes | size }}</span>
   </button>
   {%- for g in site.data.tags.groups %}
@@ -16,7 +16,7 @@
   {%- for t in gtags %}
   {%- assign c = tag_notes | where_exp: "n", "n.tags contains t.name" | size %}
   {%- if c > 0 %}
-  <button type="button" class="tag-chip" data-group="{{ g.id }}" data-tag-filter="{{ t.name | slugify }}" data-tag-label="{{ t.name }}" aria-pressed="false" title="{{ t.zh }}">
+  <button type="button" class="tag-chip" data-group="{{ g.id }}" data-filter="tag:{{ t.name | slugify }}" data-filter-label="#{{ t.name }}" aria-pressed="false" title="{{ t.zh }}">
     <span class="tag-chip-name">{{ t.name }}</span><span class="tag-chip-count">{{ c }}</span>
   </button>
   {%- endif %}

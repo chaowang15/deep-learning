@@ -1,0 +1,20 @@
+{%- comment -%}
+  Rough reading time in minutes: visible prose characters (code blocks and math excluded) / 500, at least 1.
+{%- endcomment -%}
+{%- assign rt_parts = include.content | split: "<pre" -%}
+{%- assign rt_text = "" -%}
+{%- for part in rt_parts -%}
+  {%- if forloop.first -%}{%- assign rt_text = rt_text | append: part -%}
+  {%- else -%}{%- assign rt_tail = part | split: "</pre>" | last -%}{%- assign rt_text = rt_text | append: rt_tail -%}{%- endif -%}
+{%- endfor -%}
+{%- comment -%} Drop math source (kramdown renders it as \[...\] and \(...\)): LaTeX is far longer than its reading time. {%- endcomment -%}
+{%- assign rt_parts = rt_text | replace: "\(", "\[" | replace: "\)", "\]" | split: "\[" -%}
+{%- assign rt_text = "" -%}
+{%- for part in rt_parts -%}
+  {%- if forloop.first -%}{%- assign rt_text = rt_text | append: part -%}
+  {%- else -%}{%- assign rt_tail = part | split: "\]" | last -%}{%- assign rt_text = rt_text | append: rt_tail -%}{%- endif -%}
+{%- endfor -%}
+{%- assign rt_chars = rt_text | strip_html | strip_newlines | replace: " ", "" | size -%}
+{%- assign rt_min = rt_chars | divided_by: 500 -%}
+{%- if rt_min < 1 %}{% assign rt_min = 1 %}{% endif -%}
+{{- rt_min -}}
