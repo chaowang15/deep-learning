@@ -12,6 +12,7 @@
   --note-code-block-text: #c9d1d9;
   --note-width: 900px;
   --note-link: #0b6bcb;
+  --note-topbar-bg: rgba(251, 251, 250, 0.92);
 }
 
 * {
@@ -47,7 +48,7 @@ a {
   height: 56px;
   padding: 0 28px;
   border-bottom: 1px solid var(--note-border);
-  background: rgba(251, 251, 250, 0.92);
+  background: var(--note-topbar-bg);
   backdrop-filter: blur(10px);
 }
 
@@ -670,7 +671,7 @@ a {
   place-items: center;
   border: 1px solid rgba(15, 118, 110, 0.36);
   border-radius: 50%;
-  background: rgba(15, 118, 110, 0.94);
+  background: color-mix(in srgb, var(--note-accent) 94%, transparent);
   color: #ffffff;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
   cursor: pointer;
@@ -686,7 +687,7 @@ a {
 
 .note-back-to-top:hover,
 .note-back-to-top:focus-visible {
-  background: #0b5f59;
+  background: color-mix(in srgb, var(--note-accent) 80%, #000000);
   outline: none;
   transform: translateY(6px);
 }
@@ -743,14 +744,81 @@ a {
   stroke-linecap: round;
 }
 
-.note-theme-toggle .icon-sun,
-[data-theme="dark"] .note-theme-toggle .icon-moon {
+.note-theme-picker {
+  position: relative;
+}
+
+.note-theme-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 40;
+  width: 168px;
+  padding: 8px;
+  border: 1px solid var(--note-border);
+  border-radius: 12px;
+  background: var(--note-paper);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+}
+
+.note-theme-menu[hidden] {
   display: none;
 }
 
-[data-theme="dark"] .note-theme-toggle .icon-sun {
-  display: block;
+.note-theme-menu-title {
+  padding: 2px 8px 6px;
+  color: var(--note-muted);
+  font-size: 12px;
+  font-weight: 650;
 }
+
+.note-theme-option {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--note-text);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.note-theme-option:hover,
+.note-theme-option:focus-visible {
+  outline: none;
+  background: var(--note-soft);
+}
+
+.note-theme-option.is-active {
+  color: var(--note-accent);
+  font-weight: 650;
+}
+
+.note-theme-option.is-active::after {
+  content: "✓";
+  margin-left: auto;
+}
+
+.note-theme-swatch {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.15);
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--sw-bg) 50%, var(--sw-accent) 50%);
+}
+
+.note-theme-swatch--light { --sw-bg: #fbfbfa; --sw-accent: #0f766e; }
+.note-theme-swatch--dark { --sw-bg: #0e1116; --sw-accent: #2dd4bf; }
+.note-theme-swatch--sky { --sw-bg: #eaf3fc; --sw-accent: #0369a1; }
+.note-theme-swatch--rose { --sw-bg: #fcecf1; --sw-accent: #be185d; }
+.note-theme-swatch--lavender { --sw-bg: #efebfb; --sw-accent: #6d28d9; }
+.note-theme-swatch--sepia { --sw-bg: #f3ead7; --sw-accent: #8a5a1f; }
 
 /* ---------- Post meta (date / reading time / tags) ---------- */
 
@@ -967,16 +1035,21 @@ a {
   --note-border: #262d36;
   --note-soft: #1b2129;
   --note-accent: #2dd4bf;
-  --note-code-bg: #1f2630;
-  --note-code-block-bg: #0a0d12;
-  --note-code-block-border: #262d36;
+  --note-code-bg: #252d38;
+  --note-code-block-bg: #1b222c;
+  --note-code-block-border: #344050;
   --note-link: #6cb6ff;
+  --note-topbar-bg: rgba(14, 17, 22, 0.86);
 }
 
-
-[data-theme="dark"] .note-topbar {
-  background: rgba(14, 17, 22, 0.86);
+[data-theme="dark"] .note-theme-menu {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
 }
+
+[data-theme="dark"] .note-theme-swatch {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
 
 [data-theme="dark"] .note-article h1,
 [data-theme="dark"] .note-article h2,
@@ -1219,4 +1292,93 @@ a {
     height: 38px;
     font-size: 25px;
   }
+}
+
+/* ---------- Pastel themes (light-based; code blocks stay dark, tinted to the theme) ---------- */
+
+[data-theme="sky"] {
+  --note-bg: #f1f7fd;
+  --note-paper: #ffffff;
+  --note-text: #1b2533;
+  --note-muted: #5f6f84;
+  --note-border: #d8e5f2;
+  --note-soft: #e5eff9;
+  --note-accent: #0369a1;
+  --note-link: #0b62b5;
+  --note-topbar-bg: rgba(241, 247, 253, 0.9);
+  --note-code-bg: #e2edf8;
+  --note-code-block-bg: #0f1d2e;
+  --note-code-block-border: #1f3550;
+}
+
+[data-theme="rose"] {
+  --note-bg: #fdf4f6;
+  --note-paper: #ffffff;
+  --note-text: #2a1f24;
+  --note-muted: #7a6670;
+  --note-border: #f0d9e1;
+  --note-soft: #fae7ee;
+  --note-accent: #be185d;
+  --note-link: #b4235f;
+  --note-topbar-bg: rgba(253, 244, 246, 0.9);
+  --note-code-bg: #f7e3ea;
+  --note-code-block-bg: #26161e;
+  --note-code-block-border: #432636;
+}
+
+[data-theme="lavender"] {
+  --note-bg: #f6f4fd;
+  --note-paper: #ffffff;
+  --note-text: #231f33;
+  --note-muted: #6b6585;
+  --note-border: #e1dcf3;
+  --note-soft: #ece8fa;
+  --note-accent: #6d28d9;
+  --note-link: #5b3fd1;
+  --note-topbar-bg: rgba(246, 244, 253, 0.9);
+  --note-code-bg: #e9e4f8;
+  --note-code-block-bg: #1b172c;
+  --note-code-block-border: #332b52;
+}
+
+[data-theme="sepia"] {
+  --note-bg: #f6f0e3;
+  --note-paper: #fbf7ee;
+  --note-text: #3b3428;
+  --note-muted: #7a6f5c;
+  --note-border: #e2d6bf;
+  --note-soft: #eee4cf;
+  --note-accent: #8a5a1f;
+  --note-link: #8a4b0f;
+  --note-topbar-bg: rgba(246, 240, 227, 0.9);
+  --note-code-bg: #ebe0c8;
+  --note-code-block-bg: #2a251f;
+  --note-code-block-border: #4a4135;
+  --note-code-block-text: #e6dccb;
+}
+
+[data-theme="sky"] .note-index-card:hover,
+[data-theme="rose"] .note-index-card:hover,
+[data-theme="lavender"] .note-index-card:hover,
+[data-theme="sepia"] .note-index-card:hover {
+  border-color: color-mix(in srgb, var(--note-accent) 35%, var(--note-border));
+}
+
+[data-theme="sky"] .note-article blockquote,
+[data-theme="sky"] .note-article .note-callout,
+[data-theme="rose"] .note-article blockquote,
+[data-theme="rose"] .note-article .note-callout,
+[data-theme="lavender"] .note-article blockquote,
+[data-theme="lavender"] .note-article .note-callout,
+[data-theme="sepia"] .note-article blockquote,
+[data-theme="sepia"] .note-article .note-callout {
+  background: color-mix(in srgb, var(--note-accent) 7%, var(--note-paper));
+  color: var(--note-text);
+}
+
+[data-theme="sky"] .series-nav-bar span,
+[data-theme="rose"] .series-nav-bar span,
+[data-theme="lavender"] .series-nav-bar span,
+[data-theme="sepia"] .series-nav-bar span {
+  background: var(--note-accent);
 }
