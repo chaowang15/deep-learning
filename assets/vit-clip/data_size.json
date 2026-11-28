@@ -1,0 +1,59 @@
+{
+ "steps": 2000,
+ "runs": [
+  {
+   "model": "CNN",
+   "n": 1000,
+   "params": 421642,
+   "train_acc": 0.992,
+   "test_acc": 0.8393,
+   "last_loss": 0.036756228655576706,
+   "sec": 55
+  },
+  {
+   "model": "ViT",
+   "n": 1000,
+   "params": 305034,
+   "train_acc": 0.907,
+   "test_acc": 0.7913,
+   "last_loss": 0.26631683111190796,
+   "sec": 257
+  },
+  {
+   "model": "CNN",
+   "n": 6000,
+   "params": 421642,
+   "train_acc": 0.922,
+   "test_acc": 0.8793,
+   "last_loss": 0.2076408416032791,
+   "sec": 44
+  },
+  {
+   "model": "ViT",
+   "n": 6000,
+   "params": 305034,
+   "train_acc": 0.842,
+   "test_acc": 0.8272,
+   "last_loss": 0.44132310152053833,
+   "sec": 255
+  },
+  {
+   "model": "CNN",
+   "n": 60000,
+   "params": 421642,
+   "train_acc": 0.898,
+   "test_acc": 0.8906,
+   "last_loss": 0.29205790162086487,
+   "sec": 49
+  },
+  {
+   "model": "ViT",
+   "n": 60000,
+   "params": 305034,
+   "train_acc": 0.8362,
+   "test_acc": 0.8352,
+   "last_loss": 0.4245087504386902,
+   "sec": 247
+  }
+ ]
+}

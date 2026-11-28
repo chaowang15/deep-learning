@@ -51,3 +51,6 @@ tags:
   - name: Video & Avatar
     zh: "视频与数字人"
     group: apps
+  - name: Multimodal
+    zh: "视觉编码器与多模态"
+    group: basics
