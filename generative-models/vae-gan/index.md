@@ -12,7 +12,7 @@ description: "Generative model notes split into VAE and GAN pages."
     <span>VAE intuition, ELBO derivation, from ELBO to the training loss, reparameterization, PyTorch experiments, Conv-VAE, and VQ-VAE with an autoregressive prior.</span>
   </a>
   <a class="note-index-card" href="/deep-learning/generative-models-2-gan/">
-    <strong>Generative Models 2: GAN</strong>
-    <span>GAN intuition, adversarial objective, alternating training, and implementation flow.</span>
+    <strong>GAN：原理、推导与实现</strong>
+    <span>Minimax objective, optimal discriminator and JS divergence, non-saturating loss, MLP GAN and DCGAN code with experiments, WGAN-GP, PatchGAN, StyleGAN and VQGAN.</span>
   </a>
 </div>
